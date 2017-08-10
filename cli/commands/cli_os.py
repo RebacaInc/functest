@@ -1,0 +1,89 @@
+#!/usr/bin/env python
+#
+# jose.lausuch@ericsson.com
+# All rights reserved. This program and the accompanying materials
+# are made available under the terms of the Apache License, Version 2.0
+# which accompanies this distribution, and is available at
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+
+
+import os
+
+import click
+
+from functest.utils.constants import CONST
+import functest.utils.functest_utils as ft_utils
+import functest.utils.openstack_clean as os_clean
+import functest.utils.openstack_snapshot as os_snapshot
+
+
+class CliOpenStack(object):
+
+    def __init__(self):
+        self.os_auth_url = CONST.__getattribute__('OS_AUTH_URL')
+        self.endpoint_ip = None
+        self.endpoint_port = None
+        self.openstack_creds = CONST.__getattribute__('openstack_creds')
+        self.snapshot_file = CONST.__getattribute__('openstack_snapshot_file')
+        if self.os_auth_url:
+            self.endpoint_ip = self.os_auth_url.rsplit("/")[2].rsplit(":")[0]
+            self.endpoint_port = self.os_auth_url.rsplit("/")[2].rsplit(":")[1]
+
+    def ping_endpoint(self):
+        if self.os_auth_url is None:
+            click.echo("Source the OpenStack credentials first '. $creds'")
+            exit(0)
+        response = os.system("ping -c 1 " + self.endpoint_ip + ">/dev/null")
+        if response == 0:
+            return 0
+        else:
+            click.echo("Cannot talk to the endpoint %s\n" % self.endpoint_ip)
+            exit(0)
+
+    @staticmethod
+    def show_credentials():
+        for key, value in os.environ.items():
+            if key.startswith('OS_'):
+                click.echo("{}={}".format(key, value))
+
+    def check(self):
+        self.ping_endpoint()
+        ft_utils.execute_command("check_os.sh", verbose=False)
+
+    def snapshot_create(self):
+        self.ping_endpoint()
+        if os.path.isfile(self.snapshot_file):
+            answer = raw_input("It seems there is already an OpenStack "
+                               "snapshot. Do you want to overwrite it with "
+                               "the current OpenStack status? [y|n]\n")
+            while True:
+                if answer.lower() in ["y", "yes"]:
+                    break
+                elif answer.lower() in ["n", "no"]:
+                    return
+                else:
+                    answer = raw_input("Invalid answer. Please type [y|n]\n")
+
+        click.echo("Generating Openstack snapshot...")
+        os_snapshot.main()
+
+    def snapshot_show(self):
+        if not os.path.isfile(self.snapshot_file):
+            click.echo("There is no OpenStack snapshot created. To create "
+                       "one run the command "
+                       "'functest openstack snapshot-create'")
+            return
+        with open(self.snapshot_file, 'r') as yaml_file:
+            click.echo("\n%s"
+                       % yaml_file.read())
+
+    def clean(self):
+        self.ping_endpoint()
+        if not os.path.isfile(self.snapshot_file):
+            click.echo("Not possible to clean OpenStack without a snapshot. "
+                       "This could cause problems. "
+                       "Run first the command "
+                       "'functest openstack snapshot-create'")
+            return
+        os_clean.main()

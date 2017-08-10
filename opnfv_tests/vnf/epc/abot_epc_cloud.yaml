@@ -1,0 +1,8 @@
+clouds:
+    abot-epc:
+      type: openstack
+      auth-types: [userpass]
+      endpoint: http://192.168.7.206:35357/v3
+      regions:
+        RegionOne:
+          endpoint: http://192.168.7.206:35357/v3
