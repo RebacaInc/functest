@@ -320,11 +320,8 @@ abot_epc_credential.yaml".format(os_utils.get_credentials()\
     def test_vnf(self):
         start_time = time.time()
         self.__logger.info("Running VNF Test cases....")
-        executetc = 'juju run-action abot-epc-basic/0 run \
-                   tagnames={}'.format(self.details['test_vnf']['tag_name'])
-        #os.system('juju run-action abot-epc-basic/0 run \
-        #           tagnames={}'.format(self.details['test_vnf']['tag_name']))
-        os.system(executetc)
+        os.system('juju run-action abot-epc-basic/0 run \
+                   tagnames={}'.format(self.details['test_vnf']['tag_name']))
         self.__logger.info("Testcase executed: %s", executetc)
         os.system('juju-wait')
         duration = time.time() - start_time
