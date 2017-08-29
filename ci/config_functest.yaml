@@ -159,9 +159,15 @@
     "tenant_description": "vIMS"
     "tenant_name": "cloudify_ims"
   "juju_epc":
+    "config": "juju_epc.yaml"
     "tenant_description": "OAI EPC deployed with Juju"
-    "tenant_images": {}
-    "tenant_name": "epc"
+    "tenant_name": "debayanProject"
+    "private_net_name": "abot-net"
+    "private_subnet_cidr": "172.16.0.0/24"
+    "private_subnet_name": "abot-subnet"
+    "external_router": "abot-router"
+    "external_network_name": "ext-net"
+    "dns_nameserver": ['8.8.8.8']
   "opera_ims":
     "tenant_description": "ims deployed with open-o"
     "tenant_name": "opera_ims"
@@ -169,15 +175,6 @@
     "config": "orchestra_ims.yaml"
     "tenant_description": "ims deployed with openbaton"
     "tenant_name": "orchestra_ims"
-  "abot_epc":
-    "config": "abot_epc.yaml"
-    "tenant_description": "EPC deployed with juju"
-    "tenant_name": "abot_epc"
-    "private_net_name": "abot-net"
-    "private_subnet_cidr": "172.16.0.0/24"
-    "private_subnet_name": "abot-subnet"
-    "external_router": "abot-router"
-    "dns_nameserver": ['192.168.3.122']
 "vping":
   "cleanup_objects": !!bool "true"
   "image_name": "functest-vping"
