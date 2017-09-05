@@ -68,33 +68,6 @@ def download_url(url, dest_path):
 #               CI UTILS
 #
 # -----------------------------------------------------------
-def get_installer_type():
-    """
-    Get installer type (fuel, apex, joid, compass)
-    """
-    try:
-        installer = os.environ['INSTALLER_TYPE']
-    except KeyError:
-        logger.error("Impossible to retrieve the installer type")
-        installer = "Unknown_installer"
-
-    return installer
-
-
-def get_scenario():
-    """
-    Get scenario
-    """
-    try:
-        scenario = os.environ['DEPLOY_SCENARIO']
-    except KeyError:
-        logger.info("Impossible to retrieve the scenario."
-                    "Use default os-nosdn-nofeature-noha")
-        scenario = "os-nosdn-nofeature-noha"
-
-    return scenario
-
-
 def get_version():
     """
     Get version
@@ -107,7 +80,9 @@ def get_version():
     # jenkins-functest-fuel-baremetal-weekly-master-8
     # use regex to match branch info
     rule = "(dai|week)ly-(.+?)-[0-9]*"
-    build_tag = get_build_tag()
+    build_tag = CONST.__getattribute__('BUILD_TAG')
+    if not build_tag:
+        build_tag = 'none'
     m = re.search(rule, build_tag)
     if m:
         return m.group(2)
@@ -115,40 +90,14 @@ def get_version():
         return "unknown"
 
 
-def get_pod_name():
-    """
-    Get PoD Name from env variable NODE_NAME
-    """
-    try:
-        return os.environ['NODE_NAME']
-    except KeyError:
-        logger.info(
-            "Unable to retrieve the POD name from environment. " +
-            "Using pod name 'unknown-pod'")
-        return "unknown-pod"
-
-
-def get_build_tag():
-    """
-    Get build tag of jenkins jobs
-    """
-    try:
-        build_tag = os.environ['BUILD_TAG']
-    except KeyError:
-        logger.info("Impossible to retrieve the build tag")
-        build_tag = "none"
-
-    return build_tag
-
-
 def logger_test_results(project, case_name, status, details):
     """
     Format test case results for the logger
     """
-    pod_name = get_pod_name()
-    scenario = get_scenario()
+    pod_name = CONST.__getattribute__('NODE_NAME')
+    scenario = CONST.__getattribute__('DEPLOY_SCENARIO')
     version = get_version()
-    build_tag = get_build_tag()
+    build_tag = CONST.__getattribute__('BUILD_TAG')
     db_url = CONST.__getattribute__("results_test_db_url")
 
     logger.info(
@@ -278,14 +227,14 @@ def get_ci_envvars():
 
 
 def execute_command_raise(cmd, info=False, error_msg="",
-                          verbose=True, output_file=None):
-    ret = execute_command(cmd, info, error_msg, verbose, output_file)
+                          verbose=True, output_file=None, env=None):
+    ret = execute_command(cmd, info, error_msg, verbose, output_file, env)
     if ret != 0:
         raise Exception(error_msg)
 
 
 def execute_command(cmd, info=False, error_msg="",
-                    verbose=True, output_file=None):
+                    verbose=True, output_file=None, env=None):
     if not error_msg:
         error_msg = ("The command '%s' failed." % cmd)
     msg_exec = ("Executing command: '%s'" % cmd)
@@ -294,7 +243,7 @@ def execute_command(cmd, info=False, error_msg="",
             logger.info(msg_exec)
         else:
             logger.debug(msg_exec)
-    p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE,
+    p = subprocess.Popen(cmd, env=env, shell=True, stdout=subprocess.PIPE,
                          stderr=subprocess.STDOUT)
     if output_file:
         f = open(output_file, "w")

@@ -66,8 +66,7 @@ class ODLResultVisitor(robot.api.ResultVisitor):
 class ODLTests(testcase.TestCase):
     """ODL test runner."""
 
-    odl_test_repo = os.path.join(
-        constants.CONST.__getattribute__('dir_repos'), 'odl_test')
+    odl_test_repo = constants.CONST.__getattribute__('dir_repo_odl_test')
     neutron_suite_dir = os.path.join(odl_test_repo,
                                      "csit/suites/openstack/neutron")
     basic_suite_dir = os.path.join(odl_test_repo,
@@ -234,7 +233,11 @@ class ODLTests(testcase.TestCase):
             elif installer_type == 'joid':
                 kwargs['odlip'] = os.environ['SDN_CONTROLLER']
             elif installer_type == 'compass':
+                kwargs['odlrestconfport'] = '8080'
+            elif installer_type == 'daisy':
+                kwargs['odlip'] = os.environ['SDN_CONTROLLER_IP']
                 kwargs['odlwebport'] = '8181'
+                kwargs['odlrestconfport'] = '8087'
             else:
                 kwargs['odlip'] = os.environ['SDN_CONTROLLER_IP']
         except KeyError as ex:

@@ -1,53 +1,56 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2016 Orange and others.
+# Copyright (c) 2017 Orange and others.
 #
 # All rights reserved. This program and the accompanying materials
 # are made available under the terms of the Apache License, Version 2.0
 # which accompanies this distribution, and is available at
 # http://www.apache.org/licenses/LICENSE-2.0
 
+"""CloudifyIms testcase implementation."""
+
 import logging
 import os
 import time
-import yaml
-from scp import SCPClient
 
 from cloudify_rest_client import CloudifyClient
 from cloudify_rest_client.executions import Execution
+from scp import SCPClient
+import yaml
 
+from functest.energy import energy
+from functest.opnfv_tests.openstack.snaps import snaps_utils
 import functest.opnfv_tests.vnf.ims.clearwater_ims_base as clearwater_ims_base
 from functest.utils.constants import CONST
 import functest.utils.openstack_utils as os_utils
 
 from snaps.openstack.os_credentials import OSCreds
-from snaps.openstack.create_network import NetworkSettings, SubnetSettings, \
-                                            OpenStackNetwork
-from snaps.openstack.create_security_group import SecurityGroupSettings, \
-                                                    SecurityGroupRuleSettings,\
-                                                    Direction, Protocol, \
-                                                    OpenStackSecurityGroup
+from snaps.openstack.create_network import (NetworkSettings, SubnetSettings,
+                                            OpenStackNetwork)
+from snaps.openstack.create_security_group import (SecurityGroupSettings,
+                                                   SecurityGroupRuleSettings,
+                                                   Direction, Protocol,
+                                                   OpenStackSecurityGroup)
 from snaps.openstack.create_router import RouterSettings, OpenStackRouter
-from snaps.openstack.create_instance import VmInstanceSettings, \
-                                                FloatingIpSettings, \
-                                                OpenStackVmInstance
+from snaps.openstack.create_instance import (VmInstanceSettings,
+                                             FloatingIpSettings,
+                                             OpenStackVmInstance)
 from snaps.openstack.create_flavor import FlavorSettings, OpenStackFlavor
 from snaps.openstack.create_image import ImageSettings, OpenStackImage
 from snaps.openstack.create_keypairs import KeypairSettings, OpenStackKeypair
 from snaps.openstack.create_network import PortSettings
-
-from functest.opnfv_tests.openstack.snaps import snaps_utils
 
 
 __author__ = "Valentin Boucher <valentin.boucher@orange.com>"
 
 
 class CloudifyIms(clearwater_ims_base.ClearwaterOnBoardingBase):
-    """Clearwater vIMS deployed with Cloudify Orchestrator Case"""
+    """Clearwater vIMS deployed with Cloudify Orchestrator Case."""
 
     __logger = logging.getLogger(__name__)
 
     def __init__(self, **kwargs):
+        """Initialize CloudifyIms testcase object."""
         if "case_name" not in kwargs:
             kwargs["case_name"] = "cloudify_ims"
         super(CloudifyIms, self).__init__(**kwargs)
@@ -93,6 +96,7 @@ class CloudifyIms(clearwater_ims_base.ClearwaterOnBoardingBase):
         self.__logger.info("Images needed for vIMS: %s", self.images)
 
     def prepare(self):
+        """Prepare testscase (Additional pre-configuration steps)."""
         super(CloudifyIms, self).prepare()
 
         self.__logger.info("Additional pre-configuration steps")
@@ -106,21 +110,21 @@ class CloudifyIms(clearwater_ims_base.ClearwaterOnBoardingBase):
 
         # needs some images
         self.__logger.info("Upload some OS images if it doesn't exist")
-        for image_name, image_url in self.images.iteritems():
-            self.__logger.info("image: %s, url: %s", image_name, image_url)
-            if image_url and image_name:
+        for image_name, image_file in self.images.iteritems():
+            self.__logger.info("image: %s, file: %s", image_name, image_file)
+            if image_file and image_name:
                 image_creator = OpenStackImage(
                     self.snaps_creds,
                     ImageSettings(name=image_name,
                                   image_user='cloud',
                                   img_format='qcow2',
-                                  url=image_url))
+                                  image_file=image_file))
                 image_creator.create()
                 # self.created_object.append(image_creator)
 
     def deploy_orchestrator(self):
         """
-        Deploy Cloudify Manager
+        Deploy Cloudify Manager.
 
         network, security group, fip, VM creation
         """
@@ -235,6 +239,8 @@ class CloudifyIms(clearwater_ims_base.ClearwaterOnBoardingBase):
         while str(cfy_status) != 'running' and retry:
             try:
                 cfy_status = cfy_client.manager.get_status()['status']
+                self.__logger.debug("The current manager status is %s",
+                                    cfy_status)
             except Exception:  # pylint: disable=broad-except
                 self.__logger.warning("Cloudify Manager isn't " +
                                       "up and running. Retrying ...")
@@ -259,14 +265,15 @@ class CloudifyIms(clearwater_ims_base.ClearwaterOnBoardingBase):
         self.__logger.info("Put private keypair in manager")
         if manager_creator.vm_ssh_active(block=True):
             ssh = manager_creator.ssh_client()
-            scp = SCPClient(ssh.get_transport())
+            scp = SCPClient(ssh.get_transport(), socket_timeout=15.0)
             scp.put(kp_file, '~/')
             cmd = "sudo cp ~/cloudify_ims.pem /etc/cloudify/"
-            ssh.exec_command(cmd)
+            run_blocking_ssh_command(ssh, cmd)
             cmd = "sudo chmod 444 /etc/cloudify/cloudify_ims.pem"
-            ssh.exec_command(cmd)
+            run_blocking_ssh_command(ssh, cmd)
             cmd = "sudo yum install -y gcc python-devel"
-            ssh.exec_command(cmd)
+            run_blocking_ssh_command(ssh, cmd, "Unable to install packages \
+                                                on manager")
 
         self.details['orchestrator'].update(status='PASS', duration=duration)
 
@@ -274,12 +281,11 @@ class CloudifyIms(clearwater_ims_base.ClearwaterOnBoardingBase):
             external_network_name=ext_net_name,
             network_name=network_settings.name
         ))
+        self.result = 1/3 * 100
         return True
 
     def deploy_vnf(self):
-        """
-        Deploy Clearwater IMS
-        """
+        """Deploy Clearwater IMS."""
         start_time = time.time()
 
         self.__logger.info("Upload VNFD")
@@ -290,15 +296,17 @@ class CloudifyIms(clearwater_ims_base.ClearwaterOnBoardingBase):
                                               descriptor.get('file_name'))
 
         self.__logger.info("Get or create flavor for all clearwater vm")
-        self.exist_obj['flavor2'], flavor_id = os_utils.get_or_create_flavor(
-            self.vnf['requirements']['flavor']['name'],
-            self.vnf['requirements']['flavor']['ram_min'],
-            '30',
-            '1',
-            public=True)
+        flavor_settings = FlavorSettings(
+            name=self.vnf['requirements']['flavor']['name'],
+            ram=self.vnf['requirements']['flavor']['ram_min'],
+            disk=25,
+            vcpus=1)
+        flavor_creator = OpenStackFlavor(self.snaps_creds, flavor_settings)
+        flavor_creator.create()
+        self.created_object.append(flavor_creator)
 
         self.vnf['inputs'].update(dict(
-            flavor_id=flavor_id,
+            flavor_id=self.vnf['requirements']['flavor']['name'],
         ))
 
         self.__logger.info("Create VNF Instance")
@@ -323,15 +331,15 @@ class CloudifyIms(clearwater_ims_base.ClearwaterOnBoardingBase):
         self.__logger.info(execution)
         if execution.status == 'terminated':
             self.details['vnf'].update(status='PASS', duration=duration)
-            return True
+            self.result += 1/3 * 100
+            result = True
         else:
             self.details['vnf'].update(status='FAIL', duration=duration)
-            return False
+            result = False
+        return result
 
     def test_vnf(self):
-        """
-        Run test on clearwater ims instance
-        """
+        """Run test on clearwater ims instance."""
         start_time = time.time()
 
         cfy_client = self.orchestrator['object']
@@ -342,22 +350,31 @@ class CloudifyIms(clearwater_ims_base.ClearwaterOnBoardingBase):
         ellis_ip = outputs['ellis_ip']
         self.config_ellis(ellis_ip)
 
-        if dns_ip != "":
-            vims_test_result = self.run_clearwater_live_test(
-                dns_ip=dns_ip,
-                public_domain=self.vnf['inputs']["public_domain"])
-            duration = time.time() - start_time
-            short_result = sig_test_format(vims_test_result)
-            self.__logger.info(short_result)
-            self.details['test_vnf'].update(status='PASS',
-                                            result=short_result,
-                                            full_result=vims_test_result,
-                                            duration=duration)
-            return True
-        else:
+        if not dns_ip:
             return False
 
+        vims_test_result = self.run_clearwater_live_test(
+            dns_ip=dns_ip,
+            public_domain=self.vnf['inputs']["public_domain"])
+        duration = time.time() - start_time
+        short_result, nb_test = sig_test_format(vims_test_result)
+        self.__logger.info(short_result)
+        self.details['test_vnf'].update(result=short_result,
+                                        full_result=vims_test_result,
+                                        duration=duration)
+        try:
+            vnf_test_rate = short_result['passed'] / nb_test
+            # orchestrator + vnf + test_vnf
+            self.result += vnf_test_rate / 3 * 100
+        except ZeroDivisionError:
+            self.__logger.error("No test has been executed")
+            self.details['test_vnf'].update(status='FAIL')
+            return False
+
+        return True
+
     def clean(self):
+        """Clean created objects/functions."""
         try:
             cfy_client = self.orchestrator['object']
             dep_name = self.vnf['descriptor'].get('name')
@@ -369,7 +386,7 @@ class CloudifyIms(clearwater_ims_base.ClearwaterOnBoardingBase):
                     try:
                         cfy_client.executions.cancel(execution['id'],
                                                      force=True)
-                    except:
+                    except:  # pylint: disable=broad-except
                         self.__logger.warn("Can't cancel the current exec")
 
             execution = cfy_client.executions.start(
@@ -381,7 +398,7 @@ class CloudifyIms(clearwater_ims_base.ClearwaterOnBoardingBase):
             wait_for_execution(cfy_client, execution, self.__logger)
             cfy_client.deployments.delete(self.vnf['descriptor'].get('name'))
             cfy_client.blueprints.delete(self.vnf['descriptor'].get('name'))
-        except:
+        except:  # pylint: disable=broad-except
             self.__logger.warn("Some issue during the undeployment ..")
             self.__logger.warn("Tenant clean continue ..")
 
@@ -389,9 +406,14 @@ class CloudifyIms(clearwater_ims_base.ClearwaterOnBoardingBase):
         for creator in reversed(self.created_object):
             try:
                 creator.clean()
-            except Exception as e:
-                self.logger.error('Unexpected error cleaning - %s', e)
+            except Exception as exc:
+                self.logger.error('Unexpected error cleaning - %s', exc)
         super(CloudifyIms, self).clean()
+
+    @energy.enable_recording
+    def run(self, **kwargs):
+        """Execute CloudifyIms test case."""
+        super(CloudifyIms, self).run(**kwargs)
 
 
 # ----------------------------------------------------------
@@ -401,6 +423,8 @@ class CloudifyIms(clearwater_ims_base.ClearwaterOnBoardingBase):
 # -----------------------------------------------------------
 def get_config(parameter, file_path):
     """
+    Get config parameter.
+
     Returns the value of a given parameter in file.yaml
     parameter must be given in string format with dots
     Example: general.openstack.image_name
@@ -418,9 +442,7 @@ def get_config(parameter, file_path):
 
 
 def wait_for_execution(client, execution, logger, timeout=2400, ):
-    """
-    Wait for a workflow execution on Cloudify Manager
-    """
+    """Wait for a workflow execution on Cloudify Manager."""
     # if execution already ended - return without waiting
     if execution.status in Execution.END_STATES:
         return execution
@@ -470,7 +492,7 @@ def wait_for_execution(client, execution, logger, timeout=2400, ):
 
 def _get_deployment_environment_creation_execution(client, deployment_id):
     """
-    Get the execution id of a env preparation
+    Get the execution id of a env preparation.
 
     network, security group, fip, VM creation
     """
@@ -484,9 +506,7 @@ def _get_deployment_environment_creation_execution(client, deployment_id):
 
 
 def sig_test_format(sig_test):
-    """
-    Process the signaling result to have a short result
-    """
+    """Process the signaling result to have a short result."""
     nb_passed = 0
     nb_failures = 0
     nb_skipped = 0
@@ -497,8 +517,16 @@ def sig_test_format(sig_test):
             nb_failures += 1
         elif data_test['result'] == "Skipped":
             nb_skipped += 1
-    total_sig_test_result = {}
-    total_sig_test_result['passed'] = nb_passed
-    total_sig_test_result['failures'] = nb_failures
-    total_sig_test_result['skipped'] = nb_skipped
-    return total_sig_test_result
+    short_sig_test_result = {}
+    short_sig_test_result['passed'] = nb_passed
+    short_sig_test_result['failures'] = nb_failures
+    short_sig_test_result['skipped'] = nb_skipped
+    nb_test = nb_passed + nb_skipped
+    return (short_sig_test_result, nb_test)
+
+
+def run_blocking_ssh_command(ssh, cmd, error_msg="Unable to run this command"):
+    """Command to run ssh command with the exit status."""
+    stdin, stdout, stderr = ssh.exec_command(cmd)
+    if stdout.channel.recv_exit_status() != 0:
+        raise Exception(error_msg)

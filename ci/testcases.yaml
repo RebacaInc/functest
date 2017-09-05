@@ -149,7 +149,7 @@ tiers:
                 case_name: odl
                 project_name: functest
                 criteria: 100
-                blocking: true
+                blocking: false
                 description: >-
                     Test Suite for the OpenDaylight SDN Controller. It
                     integrates some test suites from upstream using
@@ -162,8 +162,8 @@ tiers:
                     class: 'ODLTests'
                     args:
                         suites:
-                            -  /home/opnfv/repos/odl_test/csit/suites/integration/basic
-                            -  /home/opnfv/repos/odl_test/csit/suites/openstack/neutron
+                            -  /src/odl_test/csit/suites/integration/basic
+                            -  /src/odl_test/csit/suites/openstack/neutron
 
             -
                 case_name: odl_netvirt
@@ -183,9 +183,9 @@ tiers:
                     class: 'ODLTests'
                     args:
                         suites:
-                            -  /home/opnfv/repos/odl_test/csit/suites/integration/basic
-                            -  /home/opnfv/repos/odl_test/csit/suites/openstack/neutron
-                            -  /home/opnfv/repos/odl_test/csit/suites/openstack/connectivity
+                            -  /src/odl_test/csit/suites/integration/basic
+                            -  /src/odl_test/csit/suites/openstack/neutron
+                            -  /src/odl_test/csit/suites/openstack/connectivity
 
             -
                 case_name: fds
@@ -204,23 +204,7 @@ tiers:
                     class: 'ODLTests'
                     args:
                         suites:
-                            -  /home/opnfv/repos/fds/testing/robot
-
-            -
-                case_name: onos
-                project_name: functest
-                criteria: 100
-                blocking: true
-                description: >-
-                    Test Suite for the ONOS SDN Controller. It integrates
-                    some test suites from upstream using TestON as the test
-                    framework.
-                dependencies:
-                    installer: ''
-                    scenario: 'onos'
-                run:
-                    module: 'functest.opnfv_tests.sdn.onos.onos'
-                    class: 'Onos'
+                            -  /src/fds/testing/robot
 
             -
                 case_name: snaps_smoke
@@ -265,10 +249,11 @@ tiers:
                     module: 'functest.core.feature'
                     class: 'BashFeature'
                     args:
-                        cmd: 'cd /home/opnfv/repos/promise/promise/test/functest && python ./run_tests.py'
+                        cmd: 'run_promise_tests.py'
 
             -
                 case_name: doctor-notification
+                enabled: false
                 project_name: doctor
                 criteria: 100
                 blocking: false
@@ -297,7 +282,7 @@ tiers:
                     module: 'functest.core.feature'
                     class: 'BashFeature'
                     args:
-                        cmd: 'cd /usr/local/lib/python2.7/dist-packages/sdnvpn/test/functest && python ./run_tests.py'
+                        cmd: 'run_sdnvpn_tests.py'
 
             -
                 case_name: security_scan
@@ -317,68 +302,21 @@ tiers:
                         cmd: '. /home/opnfv/functest/conf/stackrc && security_scan --config /usr/local/etc/securityscanning/config.ini'
 
             -
-                case_name: copper
-                enabled: false
-                project_name: copper
-                criteria: 100
-                blocking: false
-                description: >-
-                    Test suite for policy management based on OpenStack Congress
-                dependencies:
-                    installer: 'apex'
-                    scenario: '^((?!fdio).)*$'
-                run:
-                    module: 'functest.core.feature'
-                    class: 'BashFeature'
-                    args:
-                        cmd: 'cd /home/opnfv/repos/copper/tests && bash run.sh && cd -'
-
-            -
-                case_name: multisite
-                enabled: false
-                project_name: multisite
-                criteria: 100
-                blocking: false
-                description: >-
-                    Test suite from kingbird
-                dependencies:
-                    installer: '(fuel)|(compass)'
-                    scenario: 'multisite'
-                run:
-                    module: 'functest.opnfv_tests.openstack.tempest.tempest'
-                    class: 'TempestMultisite'
-
-            -
                 case_name: functest-odl-sfc
-                enabled: false
+                enabled: true
                 project_name: sfc
                 criteria: 100
                 blocking: false
                 description: >-
-                    Test suite for odl-sfc to test two chains and two SFs
+                    Test suite for odl-sfc to test two chains with one SF and one chain with two SFs
                 dependencies:
-                    installer: '(apex)|(fuel)'
-                    scenario: 'odl_l2-sfc'
+                    installer: ''
+                    scenario: 'odl.*sfc'
                 run:
                     module: 'functest.core.feature'
                     class: 'BashFeature'
                     args:
-                        cmd: 'cd /usr/local/lib/python2.7/dist-packages/sfc/tests/functest && python ./run_tests.py'
-
-            -
-                case_name: onos_sfc
-                enabled: false
-                project_name: functest
-                criteria: 100
-                blocking: true
-                description: >-
-                    Test Suite for onos-sfc to test sfc function.
-                dependencies:
-                    installer: ''
-                    scenario: 'onos-sfc'
-                run:
-                    module: 'functest.opnfv_tests.sdn.onos.onos'
-                    class: 'OnosSfc'
+                        cmd: 'run_sfc_tests.py'
 
             -
                 case_name: parser-basics
@@ -412,39 +350,21 @@ tiers:
                     module: 'functest.core.feature'
                     class: 'BashFeature'
                     args:
-                        cmd: 'cd /home/opnfv/repos/domino && ./tests/run_multinode.sh'
-
-            -
-                case_name: gluon_vping
-                enabled: false
-                project_name: netready
-                criteria: 100
-                blocking: false
-                description: >-
-                    Test suite from Netready project.
-                dependencies:
-                    installer: 'apex'
-                    scenario: 'gluon'
-                run:
-                    module: 'functest.core.feature'
-                    class: 'BashFeature'
-                    args:
-                        cmd: 'cd /home/opnfv/repos/netready/test/functest && python ./gluon-test-suite.py'
+                        cmd: 'cd /src/domino && ./tests/run_multinode.sh'
 
             -
                 case_name: barometercollectd
-                enabled: false
+                enabled: true
                 project_name: barometer
                 criteria: 100
                 blocking: false
                 description: >-
-                    Test suite for the Barometer project. Separate tests verify the
-                    proper configuration and functionality of the following
-                    collectd plugins Ceilometer, Hugepages, Memory RAS (mcelog),
-                    and OVS Events
+                    Test suite for the Barometer project. Separate tests verify
+                    the proper configuration and basic functionality of all the
+                    collectd plugins as described in the Project Release Plan
                 dependencies:
-                    installer: 'fuel'
-                    scenario: 'kvm_ovs_dpdk_bar'
+                    installer: 'apex'
+                    scenario: 'bar'
                 run:
                      module: 'baro_tests.barometer'
                      class: 'BarometerCollectd'
@@ -508,14 +428,14 @@ tiers:
     -
         name: vnf
         order: 4
-        ci_loop: 'daily'
+        ci_loop: '(daily)|(weekly)'
         description : >-
             Collection of VNF test cases.
         testcases:
             -
                 case_name: cloudify_ims
                 project_name: functest
-                criteria: 100
+                criteria: 80
                 blocking: false
                 description: >-
                     This test case deploys an OpenSource vIMS solution from Clearwater
@@ -526,73 +446,54 @@ tiers:
                 run:
                     module: 'functest.opnfv_tests.vnf.ims.cloudify_ims'
                     class: 'CloudifyIms'
-
             -
-                case_name: aaa
-                enabled: false
+                case_name: orchestra_openims
                 project_name: functest
                 criteria: 100
                 blocking: false
                 description: >-
-                   Test suite from Parser project.
+                    OpenIMS VNF deployment with Open Baton (Orchestra)
                 dependencies:
                     installer: ''
-                    scenario: ''
+                    scenario: 'os-nosdn-nofeature-ha'
                 run:
-                    module: 'functest.opnfv_tests.vnf.aaa.aaa'
-                    class: 'AaaVnf'
+                    module: 'functest.opnfv_tests.vnf.ims.orchestra_openims'
+                    class: 'OpenImsVnf'
 
             -
-                case_name: orchestra_ims
-                enabled: false
+                case_name: orchestra_clearwaterims
                 project_name: functest
                 criteria: 100
                 blocking: false
                 description: >-
-                    VNF deployment with OpenBaton (Orchestra)
+                    ClearwaterIMS VNF deployment with Open Baton (Orchestra)
                 dependencies:
                     installer: ''
-                    scenario: ''
+                    scenario: 'os-nosdn-nofeature-ha'
                 run:
-                    module: 'functest.opnfv_tests.vnf.ims.orchestra_ims'
-                    class: 'ImsVnf'
-
-            -
-                case_name: opera_vims
-                enabled: false
-                project_name: opera
-                criteria: 100
-                blocking: false
-                description: >-
-                    VNF deployment with OPEN-O
-                dependencies:
-                    installer: 'compass'
-                    scenario: 'os-nosdn-openo-ha'
-                run:
-                    module: 'functest.opnfv_tests.vnf.ims.opera_ims'
-                    class: 'OperaIms'
+                    module: 'functest.opnfv_tests.vnf.ims.orchestra_clearwaterims'
+                    class: 'ClearwaterImsVnf'
 
             -
                 case_name: vyos_vrouter
-                enabled: false
                 project_name: functest
                 criteria: 100
                 blocking: false
                 description: >-
                     This test case is vRouter testing.
                 dependencies:
-                    installer: 'fuel'
-                    scenario: 'nosdn-nofeature'
+                    installer: ''
+                    scenario: 'os-nosdn-nofeature-ha'
                 run:
-                    module: 'functest.opnfv_tests.vnf.router.vyos_vrouter'
-                    class: 'VrouterVnf'
+                    module: 'functest.opnfv_tests.vnf.router.cloudify_vrouter'
+                    class: 'CloudifyVrouter'
 
             -
-                case_name: juju_epc 
-                enabled: true 
+                case_name: juju_epc
+                enabled: true
                 project_name: functest
                 criteria: 100
-                blocking: false 
+                blocking: false
                 description: >-
                     This test case is Juju_epc testing.
                 dependencies:

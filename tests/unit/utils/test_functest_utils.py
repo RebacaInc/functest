@@ -97,109 +97,30 @@ class FunctestUtilsTesting(unittest.TestCase):
             m.assert_called_once_with(dest, 'wb')
             self.assertTrue(mock_sh.called)
 
-    @mock.patch('functest.utils.functest_utils.logger.error')
-    def test_get_installer_type_failed(self, mock_logger_error):
-        with mock.patch.dict(os.environ,
-                             {},
-                             clear=True):
-            self.assertEqual(functest_utils.get_installer_type(),
-                             "Unknown_installer")
-            mock_logger_error.assert_called_once_with("Impossible to retrieve"
-                                                      " the installer type")
-
-    def test_get_installer_type_default(self):
-        with mock.patch.dict(os.environ,
-                             {'INSTALLER_TYPE': 'test_installer'},
-                             clear=True):
-            self.assertEqual(functest_utils.get_installer_type(),
-                             self.installer)
-
-    @mock.patch('functest.utils.functest_utils.logger.info')
-    def test_get_scenario_failed(self, mock_logger_info):
-        with mock.patch.dict(os.environ,
-                             {},
-                             clear=True):
-            self.assertEqual(functest_utils.get_scenario(),
-                             "os-nosdn-nofeature-noha")
-            mock_logger_info.assert_called_once_with("Impossible to retrieve "
-                                                     "the scenario.Use "
-                                                     "default "
-                                                     "os-nosdn-nofeature-noha")
-
-    def test_get_scenario_default(self):
-        with mock.patch.dict(os.environ,
-                             {'DEPLOY_SCENARIO': 'test_scenario'},
-                             clear=True):
-            self.assertEqual(functest_utils.get_scenario(),
-                             self.scenario)
-
-    @mock.patch('functest.utils.functest_utils.get_build_tag')
-    def test_get_version_daily_job(self, mock_get_build_tag):
-        mock_get_build_tag.return_value = self.build_tag
+    def test_get_version_daily_job(self):
+        CONST.__setattr__('BUILD_TAG', self.build_tag)
         self.assertEqual(functest_utils.get_version(), self.version)
 
-    @mock.patch('functest.utils.functest_utils.get_build_tag')
-    def test_get_version_weekly_job(self, mock_get_build_tag):
-        mock_get_build_tag.return_value = self.build_tag_week
+    def test_get_version_weekly_job(self):
+        CONST.__setattr__('BUILD_TAG', self.build_tag_week)
         self.assertEqual(functest_utils.get_version(), self.version)
 
-    @mock.patch('functest.utils.functest_utils.get_build_tag')
-    def test_get_version_with_dummy_build_tag(self, mock_get_build_tag):
-        mock_get_build_tag.return_value = 'whatever'
+    def test_get_version_with_dummy_build_tag(self):
+        CONST.__setattr__('BUILD_TAG', 'whatever')
         self.assertEqual(functest_utils.get_version(), 'unknown')
 
-    @mock.patch('functest.utils.functest_utils.get_build_tag')
-    def test_get_version_unknown(self, mock_get_build_tag):
-        mock_get_build_tag.return_value = "unknown_build_tag"
+    def test_get_version_unknown(self):
+        CONST.__setattr__('BUILD_TAG', 'unknown_build_tag')
         self.assertEqual(functest_utils.get_version(), "unknown")
-
-    @mock.patch('functest.utils.functest_utils.logger.info')
-    def test_get_pod_name_failed(self, mock_logger_info):
-        with mock.patch.dict(os.environ,
-                             {},
-                             clear=True):
-            self.assertEqual(functest_utils.get_pod_name(),
-                             "unknown-pod")
-            mock_logger_info.assert_called_once_with("Unable to retrieve "
-                                                     "the POD name from "
-                                                     "environment. Using "
-                                                     "pod name 'unknown-pod'")
-
-    def test_get_pod_name_default(self):
-        with mock.patch.dict(os.environ,
-                             {'NODE_NAME': 'test_node_name'},
-                             clear=True):
-            self.assertEqual(functest_utils.get_pod_name(),
-                             self.node_name)
-
-    @mock.patch('functest.utils.functest_utils.logger.info')
-    def test_get_build_tag_failed(self, mock_logger_info):
-        with mock.patch.dict(os.environ,
-                             {},
-                             clear=True):
-            self.assertEqual(functest_utils.get_build_tag(),
-                             "none")
-            mock_logger_info.assert_called_once_with("Impossible to retrieve"
-                                                     " the build tag")
-
-    def test_get_build_tag_default(self):
-        with mock.patch.dict(os.environ,
-                             {'BUILD_TAG': self.build_tag},
-                             clear=True):
-            self.assertEqual(functest_utils.get_build_tag(),
-                             self.build_tag)
 
     @mock.patch('functest.utils.functest_utils.logger.info')
     def test_logger_test_results(self, mock_logger_info):
         CONST.__setattr__('results_test_db_url', self.db_url)
-        with mock.patch('functest.utils.functest_utils.get_pod_name',
-                        return_value=self.node_name), \
-                mock.patch('functest.utils.functest_utils.get_scenario',
-                           return_value=self.scenario), \
-                mock.patch('functest.utils.functest_utils.get_version',
-                           return_value=self.version), \
-                mock.patch('functest.utils.functest_utils.get_build_tag',
-                           return_value=self.build_tag):
+        CONST.__setattr__('BUILD_TAG', self.build_tag)
+        CONST.__setattr__('NODE_NAME', self.node_name)
+        CONST.__setattr__('DEPLOY_SCENARIO', self.scenario)
+        with mock.patch('functest.utils.functest_utils.get_version',
+                        return_value=self.version):
             functest_utils.logger_test_results(self.project, self.case_name,
                                                self.status, self.details)
             mock_logger_info.assert_called_once_with(

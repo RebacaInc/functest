@@ -1,197 +1,206 @@
-"ONOS":
-  "environment":
-    "OC1": "10.20.0.7"
-    "OC2": "10.20.0.7"
-    "OC3": "10.20.0.7"
-    "OCN": "10.20.0.4"
-    "OCN2": "10.20.0.5"
-    "OCT": "10.20.0.1"
-    "installer_master": "10.20.0.2"
-    "installer_master_password": "r00tme"
-    "installer_master_username": "root"
-  "general":
-    "onosbench_password": "root"
-    "onosbench_username": "root"
-    "onoscli_password": "root"
-    "onoscli_username": "root"
-    "runtimeout": !!int "300"
-"energy_recorder":
-  "api_password": ""
-  "api_url": "http://opnfv.fr:8888/resources"
-  "api_user": ""
-"example":
-  "flavor": "m1.small"
-  "image_name": "functest-example-vm"
-  "private_net_name": "example-net"
-  "private_subnet_cidr": "192.168.170.0/24"
-  "private_subnet_name": "example-subnet"
-  "router_name": "example-router"
-  "sg_desc": "Example Security group"
-  "sg_name": "example-sg"
-  "vm_name": "example-vm"
-"general":
-  "dir":
-    "dir_repo_rally": "/home/opnfv/repos/rally"
-    "dir_repo_releng": "/home/opnfv/repos/releng"
-    "functest": "/home/opnfv/functest"
-    "functest_conf": "/home/opnfv/functest/conf"
-    "functest_data": "/home/opnfv/functest/data"
-    "functest_images": "/home/opnfv/functest/images"
-    "home": "/home/opnfv"
-    "ims_data": "/home/opnfv/functest/data/ims/"
-    "rally_inst": "/root/.rally"
-    "repo_barometer": "/home/opnfv/repos/barometer"
-    "repo_copper": "/home/opnfv/repos/copper"
-    "repo_doctor": "/home/opnfv/repos/doctor"
-    "repo_domino": "/home/opnfv/repos/domino"
-    "repo_fds": "/home/opnfv/repos/fds"
-    "repo_netready": "/home/opnfv/repos/netready"
-    "repo_onos": "/home/opnfv/repos/onos"
-    "repo_securityscan": "/home/opnfv/repos/securityscanning"
-    "repo_tempest": "/src/tempest"
-    "repo_vims_test": "/home/opnfv/repos/vnfs/vims-test"
-    "repo_vrouter": "/home/opnfv/repos/vnfs/vrouter"
-    "repos": "/home/opnfv/repos"
-    "results": "/home/opnfv/functest/results"
-  "flavor_extra_specs":
-    "hw:mem_page_size": "large"
-  "image_properties":
-    "hw_mem_page_size": "large"
-  "openstack":
-    "creds": "/home/opnfv/functest/conf/openstack.creds"
-    "flavor_disk": !!int "1"
-    "flavor_name": "opnfv_flavor"
-    "flavor_name_alt": "opnfv_flavor_1"
-    "flavor_ram": !!int "512"
-    "flavor_vcpus": !!int "1"
-    "image_disk_format": "qcow2"
-    "image_file_name": "cirros-0.3.5-x86_64-disk.img"
-    "image_name": "Cirros-0.3.5"
-    "image_name_alt": "Cirros-0.3.5-1"
-    "image_password": "cubswin:)"
-    "image_url": "http://download.cirros-cloud.net/0.3.5/cirros-0.3.5-x86_64-disk.img"
-    "image_user": "cirros"
-    "image_username": "cirros"
-    "neutron_private_net_name": "functest-net"
-    "neutron_private_subnet_cidr": "192.168.120.0/24"
-    "neutron_private_subnet_end": "192.168.120.254"
-    "neutron_private_subnet_gateway": "192.168.120.254"
-    "neutron_private_subnet_name": "functest-subnet"
-    "neutron_private_subnet_start": "192.168.120.2"
-    "neutron_router_name": "functest-router"
-    "snapshot_file": "/home/opnfv/functest/conf/openstack_snapshot.yaml"
-"multisite":
-  "compass":
-    "installer_password": "root"
-    "installer_username": "root"
-    "multisite_controller_ip": "10.1.0.50"
-  "fuel":
-    "installer_password": "r00tme"
-    "installer_username": "root"
-"odl_sfc":
-  "image_base_url": "http://artifacts.opnfv.org/sfc/images"
-  "image_file_name": "sfc_nsh_danube.qcow2"
-  "image_format": "qcow2"
-  "image_name": "sfc_nsh_danube"
-"onos_sfc":
-  "image_base_url": "http://artifacts.opnfv.org/sfc/demo"
-  "image_file_name": "firewall_block_image.img"
-  "image_name": "TestSfcVm"
-"promise":
-  "flavor_disk": !!int "0"
-  "flavor_name": "promise-flavor"
-  "flavor_ram": !!int "128"
-  "flavor_vcpus": !!int "1"
-  "image_name": "promise-img"
-  "network_name": "promise-net"
-  "router_name": "promise-router"
-  "subnet_cidr": "192.168.121.0/24"
-  "subnet_name": "promise-subnet"
-  "tenant_description": "promise Functionality Testing"
-  "tenant_name": "promise"
-  "user_name": "promiser"
-  "user_pwd": "test"
-"rally":
-  "deployment_name": "opnfv-rally"
-  "network_name": "rally-net"
-  "router_name": "rally-router"
-  "subnet_cidr": "192.168.140.0/24"
-  "subnet_name": "rally-subnet"
-"results":
-  "test_db_url": "http://testresults.opnfv.org/test/api/v1/results"
-"snaps":
-  "images":
-    "centos":
-      "disk_file": "/home/opnfv/functest/images/CentOS-7-x86_64-GenericCloud.qcow2"
-    "cirros":
-      "disk_file": "/home/opnfv/functest/images/cirros-0.3.5-x86_64-disk.img"
-    "glance_tests":
-      "disk_file": "/home/opnfv/functest/images/cirros-0.3.5-x86_64-disk.img"
-    "ubuntu":
-      "disk_file": "/home/opnfv/functest/images/ubuntu-14.04-server-cloudimg-amd64-disk1.img"
-  "use_floating_ips": !!bool "true"
-  "use_keystone": !!bool "true"
-"tempest":
-  "deployment_name": "opnfv-tempest"
-  "identity":
-    "tenant_description": "Tenant for Tempest test suite"
-    "tenant_name": "tempest"
-    "user_name": "tempest"
-    "user_password": "Tempest123!"
-  "object_storage":
-    "operator_role": "SwiftOperator"
-  "private_net_name": "tempest-net"
-  "private_subnet_cidr": "192.168.150.0/24"
-  "private_subnet_name": "tempest-subnet"
-  "router_name": "tempest-router"
-  "use_custom_flavors": !!bool "true"
-  "use_custom_images": !!bool "true"
-  "validation":
-    "ssh_timeout": !!int "130"
-  "volume_device_name": "vdc"
-"vnf":
-  "aaa":
-    "tenant_description": "Freeradius server"
-    "tenant_images": {}
-    "tenant_name": "aaa"
-  "cloudify_ims":
-    "config": "cloudify_ims.yaml"
-    "tenant_description": "vIMS"
-    "tenant_name": "cloudify_ims"
-  "juju_epc":
-    "config": "juju_epc.yaml"
-    "tenant_description": "OAI EPC deployed with Juju"
-    "tenant_name": "debayanProject"
-    "private_net_name": "abot-net"
-    "private_subnet_cidr": "172.16.0.0/24"
-    "private_subnet_name": "abot-subnet"
-    "external_router": "abot-router"
-    "external_network_name": "ext-net"
-    "dns_nameserver": ['8.8.8.8']
-  "opera_ims":
-    "tenant_description": "ims deployed with open-o"
-    "tenant_name": "opera_ims"
-  "orchestra_ims":
-    "config": "orchestra_ims.yaml"
-    "tenant_description": "ims deployed with openbaton"
-    "tenant_name": "orchestra_ims"
-"vping":
-  "cleanup_objects": !!bool "true"
-  "image_name": "functest-vping"
-  "keypair_name": "vPing-keypair"
-  "keypair_priv_file": "/tmp/vPing-keypair"
-  "keypair_pub_file": "/tmp/vPing-keypair.pub"
-  "ping_timeout": !!int "200"
-  "private_net_name": "vping-net"
-  "private_subnet_cidr": "192.168.130.0/24"
-  "private_subnet_name": "vping-subnet"
-  "router_name": "vping-router"
-  "sg_desc": "Security group for vPing test case"
-  "sg_name": "vPing-sg"
-  "unique_names": !!bool "true"
-  "vm_boot_timeout": !!int "180"
-  "vm_delete_timeout": !!int "100"
-  "vm_flavor": "m1.tiny"
-  "vm_name_1": "opnfv-vping-1"
-  "vm_name_2": "opnfv-vping-2"
-  "vm_ssh_connect_timeout": !!int "60"
+general:
+    dir:
+        home:               /home/opnfv
+        repos:              /home/opnfv/repos
+        dir_repo_rally:     /home/opnfv/repos/rally
+        repo_tempest:       /src/tempest
+        dir_repo_releng:    /home/opnfv/repos/releng
+        repo_vims_test:     /src/vims-test
+        repo_barometer:     /home/opnfv/repos/barometer
+        repo_doctor:        /home/opnfv/repos/doctor
+        repo_odl_test:      /src/odl_test
+        repo_fds:           /src/fds
+        repo_securityscan:  /home/opnfv/repos/securityscanning
+        functest:           /home/opnfv/functest
+        results:            /home/opnfv/functest/results
+        functest_conf:      /home/opnfv/functest/conf
+        functest_data:      /home/opnfv/functest/data
+        ims_data:           /home/opnfv/functest/data/ims/
+        router_data:        /home/opnfv/functest/data/router/
+        functest_images:    /home/opnfv/functest/images
+        rally_inst:         /root/.rally
+
+    openstack:
+        creds: /home/opnfv/functest/conf/openstack.creds
+        snapshot_file: /home/opnfv/functest/conf/openstack_snapshot.yaml
+
+        image_name: Cirros-0.3.5
+        image_name_alt: Cirros-0.3.5-1
+        image_file_name:  cirros-0.3.5-x86_64-disk.img
+        image_url: http://download.cirros-cloud.net/0.3.5/cirros-0.3.5-x86_64-disk.img
+        image_user: cirros
+        image_disk_format:  qcow2
+        image_username:  cirros
+        image_password:  cubswin:)
+
+        flavor_name: opnfv_flavor
+        flavor_name_alt: opnfv_flavor_1
+        flavor_ram: 512
+        flavor_disk: 1
+        flavor_vcpus: 1
+
+        # Private network for functest. Will be created by config_functest.py
+        neutron_private_net_name: functest-net
+        neutron_private_subnet_name: functest-subnet
+        neutron_private_subnet_cidr: 192.168.120.0/24
+        neutron_private_subnet_start: 192.168.120.2
+        neutron_private_subnet_end: 192.168.120.254
+        neutron_private_subnet_gateway: 192.168.120.254
+        neutron_router_name: functest-router
+
+snaps:
+    use_keystone: True
+    use_floating_ips: True
+    images:
+      glance_tests:
+        disk_file: /home/opnfv/functest/images/cirros-0.3.5-x86_64-disk.img
+      cirros:
+        disk_file: /home/opnfv/functest/images/cirros-0.3.5-x86_64-disk.img
+      ubuntu:
+        disk_file: /home/opnfv/functest/images/ubuntu-14.04-server-cloudimg-amd64-disk1.img
+      centos:
+        disk_file: /home/opnfv/functest/images/CentOS-7-x86_64-GenericCloud.qcow2
+      # All of these values are optional and will override the values retrieved
+      # by the RC file
+#    os_creds_override:
+#      username: {user}
+#      password: {password}
+#      auth_url: {auth_url}
+#      project_name: {project_name}
+#      identity_api_version: {2|3}
+#      network_api_version: {2}
+#      compute_api_version: {2}
+#      image_api_version: {1|2}
+#      user_domain_id: {user_domain_id}
+#      project_domain_id: {projects_domain_id}
+#      interface: {interface}
+#      cacert: {True|False}
+#      proxy_settings:
+#        host: {proxy_host}
+#        port: {proxy_port}
+#        ssh_proxy_cmd: {OpenSSH -o ProxyCommand value}
+
+vping:
+    ping_timeout:   200
+    vm_flavor: m1.tiny # adapt to your environment
+    vm_name_1: opnfv-vping-1
+    vm_name_2: opnfv-vping-2
+    image_name: functest-vping
+    private_net_name: vping-net
+    # network_type: vlan
+    # physical_network: physnet2
+    # segmentation_id: 2366
+    private_subnet_name: vping-subnet
+    private_subnet_cidr: 192.168.130.0/24
+    router_name: vping-router
+    sg_name: vPing-sg
+    sg_desc: Security group for vPing test case
+    keypair_name: vPing-keypair
+    keypair_priv_file: /tmp/vPing-keypair
+    keypair_pub_file: /tmp/vPing-keypair.pub
+    vm_boot_timeout: 180
+    vm_delete_timeout: 100
+    vm_ssh_connect_timeout: 60
+    cleanup_objects: True
+    unique_names: True
+
+odl_sfc:
+    image_base_url: "http://artifacts.opnfv.org/sfc/images"
+    image_name: sfc_nsh_danube
+    image_file_name: sfc_nsh_danube.qcow2
+    image_format: qcow2
+
+tempest:
+    deployment_name: opnfv-tempest
+    identity:
+        tenant_name: tempest
+        tenant_description: Tenant for Tempest test suite
+        user_name: tempest
+        user_password: Tempest123!
+    validation:
+        ssh_timeout: 130
+    object_storage:
+        operator_role: SwiftOperator
+    private_net_name: tempest-net
+    private_subnet_name: tempest-subnet
+    private_subnet_cidr: 192.168.150.0/24
+    router_name: tempest-router
+    use_custom_images: True
+    use_custom_flavors: False
+    volume_device_name: vdc
+
+rally:
+    deployment_name: opnfv-rally
+    network_name: rally-net
+    subnet_name: rally-subnet
+    subnet_cidr: 192.168.140.0/24
+    router_name: rally-router
+
+vnf:
+    #juju_epc:
+    #    tenant_name: epc
+    #    tenant_description: OAI EPC deployed with Juju
+    #    tenant_images: {}
+    juju_epc:
+        config:  juju_epc.yaml
+        tenant_description: OAI EPC deployed with Juju
+        tenant_name: debayan
+        private_net_name: abot-net
+        private_subnet_cidr: 172.16.0.0/24
+        private_subnet_name: abot-subnet
+        external_router: abot-router
+        external_network_name: ext-net
+        dns_nameserver: ['8.8.8.8']
+    cloudify_ims:
+        tenant_name: cloudify_ims
+        tenant_description: vIMS
+        config: cloudify_ims.yaml
+    orchestra_openims:
+        tenant_name: orchestra_openims
+        tenant_description: OpenIMS deployed with Open Baton
+        config: orchestra.yaml
+    orchestra_clearwaterims:
+        tenant_name: orchestra_clearwaterims
+        tenant_description: Clearwater IMS deployed with Open Baton
+        config: orchestra.yaml
+    vyos_vrouter:
+        tenant_name: vrouter
+        tenant_description: vRouter
+        config: cloudify_vrouter.yaml
+
+promise:
+    tenant_name: promise
+    tenant_description: promise Functionality Testing
+    user_name: promiser
+    user_pwd: test
+    image_name: promise-img
+    flavor_name: promise-flavor
+    flavor_vcpus: 1
+    flavor_ram: 128
+    flavor_disk: 0
+    network_name: promise-net
+    subnet_name: promise-subnet
+    subnet_cidr: 192.168.121.0/24
+    router_name: promise-router
+
+example:
+    vm_name: example-vm
+    flavor: m1.small
+    image_name: functest-example-vm
+    private_net_name: example-net
+    private_subnet_name: example-subnet
+    private_subnet_cidr: 192.168.170.0/24
+    router_name: example-router
+    sg_name: example-sg
+    sg_desc: Example Security group
+
+results:
+    # you can also set a file (e.g. /home/opnfv/functest/results/dump.txt) to dump results
+    # test_db_url: file:///home/opnfv/functest/results/dump.txt
+    test_db_url: http://testresults.opnfv.org/test/api/v1/results
+
+energy_recorder:
+    api_url: http://energy.opnfv.fr/resources
+    api_user: ""
+    api_password: ""
+

@@ -146,8 +146,6 @@ abot_epc_credential.yaml".format(os_utils.get_credentials()\
                                  ['project_domain_name'],
                                  self.case_dir)
             os.system(cmd)
-
-
         #self.creds['auth_url']
         os.system('apt-get -y install \
                    {}'.format(self.orchestrator['requirements']['pip']))
@@ -208,7 +206,7 @@ abot_epc_credential.yaml".format(os_utils.get_credentials()\
                 internal_subnets=[subnet_settings.name]))
         router_creator.create()
         self.created_object.append(router_creator)
-        instances = os_utils.get_instances(self.nova_client)
+        #instances = os_utils.get_instances(self.nova_client)
         self.__logger.info("Creating Flavor ....")
         flavor_settings = FlavorSettings(
             name=self.orchestrator['requirements']['flavor']['name'],
@@ -217,8 +215,8 @@ abot_epc_credential.yaml".format(os_utils.get_credentials()\
             vcpus=1)
         flavor_creator = OpenStackFlavor(self.snaps_creds, flavor_settings)
         self.__logger.info("Juju Bootstrap: Skip creation of flavors")
-        #flavor_creator.create()
-        ##self.created_object.append(flavor_creator)
+        flavor_creator.create()
+        self.created_object.append(flavor_creator)
         self.__logger.info("Installing Dependency Packages .......")
         os.system('apt-get -y install \
                    {}'.format(self.orchestrator['requirements']\
@@ -241,7 +239,7 @@ abot_epc_credential.yaml".format(os_utils.get_credentials()\
                                                self.creds['auth_url']))
          
         net_id = os_utils.get_network_id(self.neutron_client, private_net_name)
-
+        self.__logger.info("Credential information  : %s", net_id)
         juju_bootstrap_command = 'juju bootstrap abot-epc abot-controller --config \
                    network={} --metadata-source ~  --constraints mem=2G \
                    --bootstrap-series trusty --config use-floating-ip=true'.\
@@ -297,11 +295,11 @@ abot_epc_credential.yaml".format(os_utils.get_credentials()\
             self.__logger.info("Adding Security group rule....")
             os_utils.create_secgroup_rule(self.neutron_client,
                                           self.sec_group_id, 'ingress', 132)
-            #self.__logger.info("Copying the feature files to Abot_node ") 
-            #os.system('juju scp -- -r {}/featureFiles abot-epc-basic/0:~/'.format(self.case_dir))
-            #self.__logger.info("Copying the feature files in Abot_node ")
-            #os.system("juju ssh abot-epc-basic/0 'sudo rsync -azvv ~/featureFiles /var/lib/juju/agents/unit-abot-epc-basic-0/charm/lib/'")
-            time.sleep(120)
+            self.__logger.info("Copying the feature files to Abot_node ") 
+            os.system('juju scp -- -r {}/featureFiles abot-epc-basic/0:~/'.format(self.case_dir))
+            self.__logger.info("Copying the feature files in Abot_node ")
+            os.system("juju ssh abot-epc-basic/0 'sudo rsync -azvv ~/featureFiles /etc/rebaca-test-suite/featureFiles'")
+            time.sleep(60)
             count = 0
             while count < 10:
                 epcstatus = os.system('juju status oai-epc | grep OAI\ EPC\ is\ running')
@@ -322,7 +320,6 @@ abot_epc_credential.yaml".format(os_utils.get_credentials()\
         self.__logger.info("Running VNF Test cases....")
         os.system('juju run-action abot-epc-basic/0 run \
                    tagnames={}'.format(self.details['test_vnf']['tag_name']))
-        self.__logger.info("Testcase executed: %s", executetc)
         os.system('juju-wait')
         duration = time.time() - start_time
         self.__logger.info("Getting results from Abot node....")

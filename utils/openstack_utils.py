@@ -23,6 +23,7 @@ from novaclient import client as novaclient
 from keystoneclient import client as keystoneclient
 from neutronclient.neutron import client as neutronclient
 
+from functest.utils.constants import CONST
 import functest.utils.functest_utils as ft_utils
 
 logger = logging.getLogger(__name__)
@@ -117,13 +118,15 @@ def get_credentials(other_creds={}):
 def source_credentials(rc_file):
     with open(rc_file, "r") as f:
         for line in f:
-            var = line.rstrip('"\n').replace('export ', '').split("=")
+            var = (line.rstrip('"\n').replace('export ', '').split("=")
+                   if re.search(r'(.*)=(.*)', line) else None)
             # The two next lines should be modified as soon as rc_file
             # conforms with common rules. Be aware that it could induce
             # issues if value starts with '
-            key = re.sub(r'^["\' ]*|[ \'"]*$', '', var[0])
-            value = re.sub(r'^["\' ]*|[ \'"]*$', '', "".join(var[1:]))
-            os.environ[key] = value
+            if var:
+                key = re.sub(r'^["\' ]*|[ \'"]*$', '', var[0])
+                value = re.sub(r'^["\' ]*|[ \'"]*$', '', "".join(var[1:]))
+                os.environ[key] = value
 
 
 def get_credentials_for_rally():
@@ -710,6 +713,8 @@ def get_private_net(neutron_client):
 
 
 def get_external_net(neutron_client):
+    if (hasattr(CONST, 'EXTERNAL_NETWORK')):
+        return CONST.__getattribute__('EXTERNAL_NETWORK')
     for network in neutron_client.list_networks()['networks']:
         if network['router:external']:
             return network['name']
@@ -717,6 +722,11 @@ def get_external_net(neutron_client):
 
 
 def get_external_net_id(neutron_client):
+    if (hasattr(CONST, 'EXTERNAL_NETWORK')):
+        networks = neutron_client.list_networks(
+            name=CONST.__getattribute__('EXTERNAL_NETWORK'))
+        net_id = networks['networks'][0]['id']
+        return net_id
     for network in neutron_client.list_networks()['networks']:
         if network['router:external']:
             return network['id']
@@ -1374,13 +1384,25 @@ def get_role_id(keystone_client, role_name):
     return id
 
 
+def get_domain_id(keystone_client, domain_name):
+    domains = keystone_client.domains.list()
+    id = ''
+    for d in domains:
+        if d.name == domain_name:
+            id = d.id
+            break
+    return id
+
+
 def create_tenant(keystone_client, tenant_name, tenant_description):
     try:
         if is_keystone_v3():
+            domain_name = CONST.__getattribute__('OS_PROJECT_DOMAIN_NAME')
+            domain_id = get_domain_id(keystone_client, domain_name)
             tenant = keystone_client.projects.create(
                 name=tenant_name,
                 description=tenant_description,
-                domain="default",
+                domain=domain_id,
                 enabled=True)
         else:
             tenant = keystone_client.tenants.create(tenant_name,
@@ -1539,3 +1561,62 @@ def get_resource(heat_client, stack_id, resource):
     except Exception as e:
         logger.error("Error [get_resource]: %s" % e)
         return None
+
+
+# *********************************************
+#   TEMPEST
+# *********************************************
+def init_tempest_cleanup(tempest_config_dir=None,
+                         tempest_config_filename='tempest.conf',
+                         output_file=None):
+    """
+    Initialize the Tempest Cleanup utility.
+    See  https://docs.openstack.org/tempest/latest/cleanup.html for docs.
+
+    :param tempest_config_dir: The directory where the Tempest config file is
+            located. If not specified, we let Tempest pick both the directory
+            and the filename (i.e. second parameter is ignored)
+    :param tempest_config_filename: The filename of the Tempest config file
+    :param output_file: Optional file where to save output
+    """
+    # The Tempest cleanup utility currently offers no cmd argument to specify
+    # the config file, therefore it has to be configured with env variables
+    env = None
+    if tempest_config_dir:
+        env = os.environ.copy()
+        env['TEMPEST_CONFIG_DIR'] = tempest_config_dir
+        env['TEMPEST_CONFIG'] = tempest_config_filename
+
+    # If this command fails, an exception must be raised to stop the script
+    # otherwise the later cleanup would destroy also other resources
+    cmd_line = "tempest cleanup --init-saved-state"
+    ft_utils.execute_command_raise(cmd_line, env=env, output_file=output_file,
+                                   error_msg="Tempest cleanup init failed")
+
+
+def perform_tempest_cleanup(tempest_config_dir=None,
+                            tempest_config_filename='tempest.conf',
+                            output_file=None):
+    """
+    Perform cleanup using the Tempest Cleanup utility.
+    See  https://docs.openstack.org/tempest/latest/cleanup.html for docs.
+
+    :param tempest_config_dir: The directory where the Tempest config file is
+            located. If not specified, we let Tempest pick both the directory
+            and the filename (i.e. second parameter is ignored)
+    :param tempest_config_filename: The filename of the Tempest config file
+    :param output_file: Optional file where to save output
+    """
+    # The Tempest cleanup utility currently offers no cmd argument to specify
+    # the config file, therefore it has to be configured with env variables
+    env = None
+    if tempest_config_dir:
+        env = os.environ.copy()
+        env['TEMPEST_CONFIG_DIR'] = tempest_config_dir
+        env['TEMPEST_CONFIG'] = tempest_config_filename
+
+    # If this command fails, an exception must be raised to stop the script
+    # otherwise the later cleanup would destroy also other resources
+    cmd_line = "tempest cleanup"
+    ft_utils.execute_command(cmd_line, env=env, output_file=output_file,
+                             error_msg="Tempest cleanup failed")

@@ -13,7 +13,6 @@ import time
 import uuid
 
 from functest.core import testcase
-from functest.utils import functest_utils
 from functest.utils.constants import CONST
 
 from snaps.openstack import create_flavor
@@ -43,8 +42,14 @@ class VPingBase(testcase.TestCase):
         if 'os_creds' in kwargs:
             self.os_creds = kwargs['os_creds']
         else:
+            creds_override = None
+            if hasattr(CONST, 'snaps_os_creds_override'):
+                creds_override = CONST.__getattribute__(
+                    'snaps_os_creds_override')
+
             self.os_creds = openstack_tests.get_credentials(
-                os_env_file=CONST.__getattribute__('openstack_creds'))
+                os_env_file=CONST.__getattribute__('openstack_creds'),
+                overrides=creds_override)
 
         self.creators = list()
         self.image_creator = None
@@ -102,19 +107,38 @@ class VPingBase(testcase.TestCase):
             'vping_private_subnet_name') + self.guid
         private_subnet_cidr = CONST.__getattribute__(
             'vping_private_subnet_cidr')
+
+        vping_network_type = None
+        vping_physical_network = None
+        vping_segmentation_id = None
+
+        if (hasattr(CONST, 'vping_network_type')):
+            vping_network_type = CONST.__getattribute__(
+                'vping_network_type')
+        if (hasattr(CONST, 'vping_physical_network')):
+            vping_physical_network = CONST.__getattribute__(
+                'vping_physical_network')
+        if (hasattr(CONST, 'vping_segmentation_id')):
+            vping_segmentation_id = CONST.__getattribute__(
+                'vping_segmentation_id')
+
         self.logger.info(
             "Creating network with name: '%s'" % private_net_name)
         self.network_creator = deploy_utils.create_network(
             self.os_creds,
-            NetworkSettings(name=private_net_name,
-                            subnet_settings=[SubnetSettings(
-                                name=private_subnet_name,
-                                cidr=private_subnet_cidr)]))
+            NetworkSettings(
+                name=private_net_name,
+                network_type=vping_network_type,
+                physical_network=vping_physical_network,
+                segmentation_id=vping_segmentation_id,
+                subnet_settings=[SubnetSettings(
+                    name=private_subnet_name,
+                    cidr=private_subnet_cidr)]))
         self.creators.append(self.network_creator)
 
         self.logger.info(
             "Creating flavor with name: '%s'" % self.flavor_name)
-        scenario = functest_utils.get_scenario()
+        scenario = CONST.__getattribute__('DEPLOY_SCENARIO')
         flavor_metadata = None
         if 'ovs' in scenario or 'fdio' in scenario:
             flavor_metadata = create_flavor.MEM_PAGE_SIZE_LARGE

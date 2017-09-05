@@ -511,7 +511,22 @@ class ODLRunTesting(ODLTesting):
     def test_compass(self):
         os.environ["INSTALLER_TYPE"] = "compass"
         self._test_run(testcase.TestCase.EX_OK,
-                       odlip=self._neutron_ip, odlwebport='8181')
+                       odlip=self._neutron_ip, odlrestconfport='8080')
+
+    def test_daisy_no_controller_ip(self):
+        with mock.patch('functest.utils.openstack_utils.get_endpoint',
+                        return_value="http://{}:9696".format(
+                            ODLTesting._neutron_ip)):
+            os.environ["INSTALLER_TYPE"] = "daisy"
+            self.assertEqual(self.test.run(),
+                             testcase.TestCase.EX_RUN_ERROR)
+
+    def test_daisy(self):
+        os.environ["SDN_CONTROLLER_IP"] = self._sdn_controller_ip
+        os.environ["INSTALLER_TYPE"] = "daisy"
+        self._test_run(testcase.TestCase.EX_OK,
+                       odlip=self._sdn_controller_ip, odlwebport='8181',
+                       odlrestconfport='8087')
 
 
 class ODLArgParserTesting(ODLTesting):

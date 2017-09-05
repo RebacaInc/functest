@@ -21,7 +21,7 @@ vnf:
     version: '1'
     descriptor:
         name: abot-oai-epc 
-        file_name: /src/functest_abot_epc/charms/abot_charm/bundle.yaml
+        file_name: /src/epc-test/local-charm/bundle.yaml
         version: '10'
     requirements:
         flavor:

@@ -1,6 +1,6 @@
 tenant_images:
-    ubuntu_14.04: http://cloud-images.ubuntu.com/trusty/current/trusty-server-cloudimg-amd64-disk1.img
-    cloudify_manager_4.0: http://repository.cloudifysource.org/cloudify/4.0.1/sp-release/cloudify-manager-premium-4.0.1.qcow2
+    ubuntu_14.04: /home/opnfv/functest/images/trusty-server-cloudimg-amd64-disk1.img
+    cloudify_manager_4.0: /home/opnfv/functest/images/cloudify-manager-premium-4.0.1.qcow2
 orchestrator:
     name: cloudify
     version: '4.0'
@@ -19,7 +19,7 @@ vnf:
         version: '122'
     requirements:
         flavor:
-          name: m1.medium
+          name: m1.small
           ram_min: 2048
     inputs:
         image_id: 'ubuntu_14.04'
