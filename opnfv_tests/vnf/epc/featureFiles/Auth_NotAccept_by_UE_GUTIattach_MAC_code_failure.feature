@@ -14,7 +14,7 @@
     When I stop S1AP simulator on node ABOT
     When I run the SSH command "sudo service mme_gw restart" on node MME
     Given that I setup S1AP Simulator with USIM parameter "ABOT.UE.USIM.AttachWithImsi=true" on node ABOT
-    Given that I setup S1AP Simulator with USIM parameter "ABOT.UE.USIM.USIM_API_K_VALUE=8BAF473F2F8FD09487CCCBD7097C6862" on node ABOT
+    Given that I setup S1AP Simulator with USIM parameter "ABOT.UE.USIM.USIM_API_K=\"8BAF473F2F8FD09487CCCBD7097C6862\"" on node ABOT
     Given the execution is paused for {abotprop.WAIT_10_SEC} seconds    
     Then the ending steps are complete
 
@@ -23,7 +23,7 @@
     Given that I setup S1AP Simulator with USIM parameter "ABOT.UE.USIM.AttachWithImsi=false" on node ABOT
 
     # CORRECT K_VALUE is 8BAF473F2F8FD09487CCCBD7097C6862 WRONG K_VALUE fec86ba6eb707ed08905757b1bb44b8f 
-    Given that I setup S1AP Simulator with USIM parameter "ABOT.UE.USIM.USIM_API_K=fec86ba6eb707ed08905757b1bb44b8f" on node ABOT
+    Given that I setup S1AP Simulator with USIM parameter "ABOT.UE.USIM.USIM_API_K=\"fec86ba6eb707ed08905757b1bb44b8f\"" on node ABOT
 
     # Execute ABOT S1AP Simulator
     When I run S1AP simulator on node ABOT with 1 UE

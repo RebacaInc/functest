@@ -151,7 +151,7 @@ abot_epc_credential.yaml".format(os_utils.get_credentials()\
                    {}'.format(self.orchestrator['requirements']['pip']))
         os.system('pip3 install {}'.format(self.orchestrator['requirements']\
                                            ['pip3_packages']))
-
+        
         self.__logger.info("Upload some OS images if it doesn't exist")
         for image_name, image_url in self.images.iteritems():
             self.__logger.info("image: %s, url: %s", image_name, image_url)
@@ -244,13 +244,8 @@ abot_epc_credential.yaml".format(os_utils.get_credentials()\
                    network={} --metadata-source ~  --constraints mem=2G \
                    --bootstrap-series trusty --config use-floating-ip=true'.\
                    format(net_id)
-
         self.__logger.info("Juju Bootstrapping with Command: %s", juju_bootstrap_command)
-
         os.system(juju_bootstrap_command)
-
-        #self.__logger.info("JUJU Bootstraping Completed.... - sleeping for 5 min")
-        #time.sleep(300)
         return True
 
     def deploy_vnf(self):
@@ -259,7 +254,6 @@ abot_epc_credential.yaml".format(os_utils.get_credentials()\
         self.__logger.info("Upload VNFD")
         descriptor = self.vnf['descriptor']
         #download_url(descriptor.get('url'), self.case_dir)
-
         self.__logger.info("Get or create flavor for all Abot-EPC")
         flavor_settings = FlavorSettings(
             name=self.vnf['requirements']['flavor']['name'],
@@ -267,18 +261,17 @@ abot_epc_credential.yaml".format(os_utils.get_credentials()\
             disk=10,
             vcpus=1)
         self.__logger.info("Abot Epc: Skip creation of flavors")
-        #flavor_creator = OpenStackFlavor(self.snaps_creds, flavor_settings)
-        #flavor_creator.create()
-        #self.created_object.append(flavor_creator)
-
+        flavor_creator = OpenStackFlavor(self.snaps_creds, flavor_settings)
+        flavor_creator.create()
+        self.created_object.append(flavor_creator)
         self.__logger.info("Deploying Abot-epc bundle file ...") 
-        #os.system('juju deploy {}'.format(self.case_dir + '/' + 
         os.system('juju deploy {}'.format('/' + 
                                           descriptor.get('file_name')))
         self.__logger.info("Waiting for instances .....")
         status = os.system('juju-wait')
         self.__logger.info("juju wait completed: %s", status)
         self.__logger.info("Deployed Abot-epc on Openstack")
+        duration = time.time() - start_time
         if status == 0:
             instances =  self.nova_client.servers.list()
             #instances = os_utils.get_instances(self.nova_client)
@@ -299,7 +292,6 @@ abot_epc_credential.yaml".format(os_utils.get_credentials()\
             os.system('juju scp -- -r {}/featureFiles abot-epc-basic/0:~/'.format(self.case_dir))
             self.__logger.info("Copying the feature files in Abot_node ")
             os.system("juju ssh abot-epc-basic/0 'sudo rsync -azvv ~/featureFiles /etc/rebaca-test-suite/featureFiles'")
-            time.sleep(60)
             count = 0
             while count < 10:
                 epcstatus = os.system('juju status oai-epc | grep OAI\ EPC\ is\ running')
@@ -308,20 +300,18 @@ abot_epc_credential.yaml".format(os_utils.get_credentials()\
                 else:
                    time.sleep(60)
                    count = count + 1
-            os.system('juju run-action abot-epc-basic/0 run \
-                       tagnames={}'.format('Attach_Procedure_AttachWithIMSI'))
+            #os.system('juju run-action abot-epc-basic/0 run \
+            #           tagnames={}'.format('Attach_Procedure_AttachWithIMSI'))
             os.system('juju-wait')
             return True
         else:
             return False
 
     def test_vnf(self):
-        start_time = time.time()
         self.__logger.info("Running VNF Test cases....")
         os.system('juju run-action abot-epc-basic/0 run \
                    tagnames={}'.format(self.details['test_vnf']['tag_name']))
         os.system('juju-wait')
-        duration = time.time() - start_time
         self.__logger.info("Getting results from Abot node....")
         os.system('juju scp abot-epc-basic/0:/var/lib/abot-epc-basic/artifacts/TestResults.json {}/.'.\
                    format(self.case_dir))

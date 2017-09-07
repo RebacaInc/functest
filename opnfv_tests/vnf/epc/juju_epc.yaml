@@ -13,7 +13,7 @@ orchestrator:
         repo_link: 'ppa:juju/stable' 
         flavor:
           name: m1.small
-          ram_min: 1024 
+          ram_min: 2048 
         pip3_packages: juju-wait
         preserve_setup: True 
 vnf:
@@ -21,13 +21,13 @@ vnf:
     version: '1'
     descriptor:
         name: abot-oai-epc 
-        file_name: /src/epc-test/local-charm/bundle.yaml
-        version: '10'
+        file_name: /src/epc-test/abot_charm/functest-abot-epc-bundle/bundle.yaml
+        version: '1'
     requirements:
         flavor:
-          name: m1.medium
+          name: m1.large
           ram_min: 4096 
 vnf_test_suite:
     name: abot-epc-basic 
-    version: "1.0"
+    version: "3.1.0"
     tag_name: "TS_24_301"
