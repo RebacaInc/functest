@@ -109,7 +109,7 @@ class JujuEpc(vnf.VnfOnBoarding):
     
     def prepare(self):
         """Prepare testcase (Additional pre-configuration steps)."""
-
+        start_time = time.time()
         self.__logger.debug("OS Credentials: %s", os_utils.get_credentials())
 
         if os_utils.get_credentials()['project_name'] == self.tenant_name:
@@ -164,11 +164,11 @@ abot_epc_credential.yaml".format(os_utils.get_credentials()\
                                   url=image_url))
                 image_creator.create()
                 self.created_object.append(image_creator)
-
+        duration = time.time() - start_time
 
     def deploy_orchestrator(self):
         self.__logger.info("Deployed Orchestrator")
-
+        start_time = time.time()
         private_net_name = CONST.__getattribute__(
                 'vnf_{}_private_net_name'.format(self.case_name))
         private_subnet_name = CONST.__getattribute__(
@@ -244,9 +244,9 @@ abot_epc_credential.yaml".format(os_utils.get_credentials()\
                    network={} --metadata-source ~  --constraints mem=2G \
                    --bootstrap-series trusty --config use-floating-ip=true'.\
                    format(net_id)
-        self.__logger.info("Juju Bootstrapping with Command: %s", juju_bootstrap_command)
         os.system(juju_bootstrap_command)
         return True
+        duration = time.time() - start_time
 
     def deploy_vnf(self):
         """Deploy ABOT-OAI-EPC."""
@@ -260,7 +260,6 @@ abot_epc_credential.yaml".format(os_utils.get_credentials()\
             ram=self.vnf['requirements']['flavor']['ram_min'],
             disk=10,
             vcpus=1)
-        self.__logger.info("Abot Epc: Skip creation of flavors")
         flavor_creator = OpenStackFlavor(self.snaps_creds, flavor_settings)
         flavor_creator.create()
         self.created_object.append(flavor_creator)
@@ -271,13 +270,10 @@ abot_epc_credential.yaml".format(os_utils.get_credentials()\
         status = os.system('juju-wait')
         self.__logger.info("juju wait completed: %s", status)
         self.__logger.info("Deployed Abot-epc on Openstack")
-        duration = time.time() - start_time
         if status == 0:
             instances =  self.nova_client.servers.list()
-            #instances = os_utils.get_instances(self.nova_client)
-            self.__logger.info("Insatance details: %s", instances)
             for items in instances:
-                self.__logger.info("Getting information from Instances %s", items)
+                #self.__logger.info("Getting information from Instances %s", items)
                 metadata = get_instance_metadata(self.nova_client, items)
                 if metadata.has_key('juju-units-deployed'):
                     sec_group = 'juju-' + metadata['juju-controller-uuid'] + \
@@ -306,12 +302,16 @@ abot_epc_credential.yaml".format(os_utils.get_credentials()\
             return True
         else:
             return False
+        
+        duration = time.time() - start_time
 
     def test_vnf(self):
+        start_time = time.time()
         self.__logger.info("Running VNF Test cases....")
         os.system('juju run-action abot-epc-basic/0 run \
                    tagnames={}'.format(self.details['test_vnf']['tag_name']))
         os.system('juju-wait')
+        duration = time.time() - start_time
         self.__logger.info("Getting results from Abot node....")
         os.system('juju scp abot-epc-basic/0:/var/lib/abot-epc-basic/artifacts/TestResults.json {}/.'.\
                    format(self.case_dir))

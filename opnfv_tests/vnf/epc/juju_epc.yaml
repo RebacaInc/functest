@@ -15,7 +15,7 @@ orchestrator:
           name: m1.small
           ram_min: 2048 
         pip3_packages: juju-wait
-        preserve_setup: True 
+        preserve_setup: False 
 vnf:
     name: juju_epc 
     version: '1'
@@ -25,7 +25,7 @@ vnf:
         version: '1'
     requirements:
         flavor:
-          name: m1.large
+          name: m.medium
           ram_min: 4096 
 vnf_test_suite:
     name: abot-epc-basic 
