@@ -1,8 +1,6 @@
 tenant_images:
     trusty: http://cloud-images.ubuntu.com/trusty/current/trusty-server-cloudimg-amd64-disk1.img
-#    trusty: http://192.168.7.113/trusty-server-cloudimg-amd64-disk1.img
     xenial: http://cloud-images.ubuntu.com/xenial/current/xenial-server-cloudimg-amd64-disk1.img 
-#    xenial: http://192.168.7.113/xenial-server-cloudimg-amd64-disk1.img
 
 orchestrator:
     name: juju 
