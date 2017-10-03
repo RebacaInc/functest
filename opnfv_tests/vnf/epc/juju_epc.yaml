@@ -13,7 +13,7 @@ orchestrator:
           name: m1.small
           ram_min: 2048 
         pip3_packages: juju-wait
-        preserve_setup: true 
+        preserve_setup: false 
 vnf:
     name: juju_epc 
     version: '1'

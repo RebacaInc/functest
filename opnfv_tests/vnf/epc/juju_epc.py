@@ -224,7 +224,8 @@ cloud.yaml".format(self.creds['auth_url'], self.case_dir)
         self.__logger.info("Credential information  : %s", net_id)
         juju_bootstrap_command = 'juju bootstrap abot-epc abot-controller ' \
                                  '--config network={} --metadata-source ~  ' \
-                                 '--constraints mem=2G --bootstrap-series trusty ' \
+                                 '--constraints mem=2G --bootstrap-series ' \
+                                 'trusty ' \
                                  '--config use-floating-ip=true'. \
             format(net_id)
         os.system(juju_bootstrap_command)
@@ -253,7 +254,7 @@ cloud.yaml".format(self.creds['auth_url'], self.case_dir)
             instances = self.nova_client.servers.list()
             for items in instances:
                 metadata = get_instance_metadata(self.nova_client, items)
-                if metadata.has_key('juju-units-deployed'):
+                if 'juju-units-deployed' in metadata:
                     sec_group = 'juju-' + metadata['juju-controller-uuid'] + \
                                 '-' + metadata['juju-model-uuid']
                     self.sec_group_id = os_utils.get_security_group_id(
@@ -348,7 +349,7 @@ json'.format(self.case_dir))
                 try:
                     creator.clean()
                 except Exception as exc:
-                    self.logger.error('Unexpected error cleaning - %s', exc)
+                    self.__logger.error('Unexpected error cleaning - %s', exc)
 
             self.__logger.info("Releasing all the floating IPs")
             user_id = os_utils.get_user_id(self.keystone_client,
@@ -440,7 +441,6 @@ def update_data(obj):
             element['final_result'] = "passed"
             element['flatten_steps'] = []
 
-            i = 0
             for step in element['steps']:
                 temp_dict = {}
                 step['result'][step['result']['status']] = 1
@@ -475,5 +475,5 @@ def get_instance_metadata(nova_client, instance):
         instance = nova_client.servers.get(instance.id)
         return instance.metadata
     except Exception as e:
-        logger.error("Error [get_instance_status(nova_client)]: %s" % e)
+        logging.error("Error [get_instance_status(nova_client)]: %s" % e)
         return None
