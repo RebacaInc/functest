@@ -20,11 +20,15 @@ import functest.utils.openstack_utils as os_utils
 from functest.opnfv_tests.openstack.snaps import snaps_utils
 
 from snaps.openstack.os_credentials import OSCreds
-from snaps.openstack.create_network import NetworkSettings, SubnetSettings
+from snaps.openstack.create_network import NetworkSettings
+from snaps.openstack.create_network import SubnetSettings
 from snaps.openstack.create_network import OpenStackNetwork
-from snaps.openstack.create_router import RouterSettings, OpenStackRouter
-from snaps.openstack.create_flavor import FlavorSettings, OpenStackFlavor
-from snaps.openstack.create_image import ImageSettings, OpenStackImage
+from snaps.openstack.create_router import RouterSettings
+from snaps.openstack.create_router import OpenStackRouter
+from snaps.openstack.create_flavor import FlavorSettings
+from snaps.openstack.create_flavor import OpenStackFlavor
+from snaps.openstack.create_image import ImageSettings
+from snaps.openstack.create_image import OpenStackImage
 import pkg_resources
 from snaps.openstack.tests import openstack_tests
 
