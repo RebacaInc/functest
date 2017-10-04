@@ -43,21 +43,19 @@ class JujuEpcTesting(unittest.TestCase):
                                                     {'name': 'm1.medium',
                                                      'ram_min': 4096}}}}
         with mock.patch('functest.opnfv_tests.vnf.epc.juju_epc.'
-                        'os.makedirs'),\
-             mock.patch('functest.opnfv_tests.vnf.epc.juju_epc.'
-                       'get_config', return_value={
-                           'tenant_images': 'foo',
-                           'orchestrator': self.orchestrator,
-                           'vnf': self.vnf,
-                           'vnf_test_suite': '',
-                           'version': 'whatever'}),\
-             mock.patch('functest.utils.openstack_utils.'
-                        'get_keystone_client', return_value='test'),\
-             mock.patch('functest.utils.openstack_utils.'
-                        'get_glance_client', return_value='test'),\
-             mock.patch('functest.utils.openstack_utils.'
-                        'get_neutron_client', return_value='test'),\
-             mock.patch('functest.utils.openstack_utils.'
+                        'os.makedirs'), mock.patch(
+            'functest.opnfv_tests.vnf.epc.juju_epc.' 'get_config',
+            return_value={'tenant_images': 'foo',
+                          'orchestrator': self.orchestrator,
+                          'vnf': self.vnf, 'vnf_test_suite': '',
+                          'version': 'whatever'}), mock.patch(
+            'functest.utils.openstack_utils.' 'get_keystone_client',
+            return_value='test'), mock.patch(
+            'functest.utils.openstack_utils.' 'get_glance_client',
+            return_value='test'), mock.patch(
+            'functest.utils.openstack_utils.' 'get_neutron_client',
+            return_value='test'), mock.patch(
+            'functest.utils.openstack_utils.'
                         'get_nova_client', return_value='test'):
 
             self.epc_vnf = juju_epc.JujuEpc()
