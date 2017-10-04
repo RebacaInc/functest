@@ -29,7 +29,8 @@ class JujuEpcTesting(unittest.TestCase):
                                               'pip': 'python3-pip',
                                               'repo_link': 'ppa:juju/stable',
                                               'dep_package': 'software-'
-                                                             'properties-common',
+                                                             'properties'
+                                                             '-common',
                                               'pip3_packages': 'juju-wait'}}
         self.vnf = {'name': 'juju_epc',
                     'descriptor': {'version': '1',
@@ -81,7 +82,10 @@ class JujuEpcTesting(unittest.TestCase):
     def test_prepare_default(self, *args):
         self.epc_vnf.orchestrator = self.orchestrator
         self.assertIsNone(self.epc_vnf.prepare())
-        args[4].assert_called_once_with('test', 'debayan', 'OAI EPC deployed with Juju')
+        args[4].assert_called_once_with('test',
+                                        'debayan',
+                                        'OAI EPC deployed '
+                                        'with Juju')
 
 #    @mock.patch('functest.core.vnf.os_utils.get_keystone_client',
 #                return_value='test')
