@@ -10,10 +10,8 @@ import unittest
 
 import mock
 
-from functest.core import vnf
-from functest.opnfv_tests.vnf.epc import juju_epc
 
-from snaps.openstack.os_credentials import OSCreds
+from functest.opnfv_tests.vnf.epc import juju_epc
 
 
 class JujuEpcTesting(unittest.TestCase):
@@ -30,33 +28,35 @@ class JujuEpcTesting(unittest.TestCase):
                                                          'ram_min': 2048},
                                               'pip': 'python3-pip',
                                               'repo_link': 'ppa:juju/stable',
-                                              'dep_package': 'software-properties-common',
+                                              'dep_package': 'software-'
+                                                             'properties-common',
                                               'pip3_packages': 'juju-wait'}}
-        
-
         self.vnf = {'name': 'juju_epc',
                     'descriptor': {'version': '1',
-                                   'file_name': '/src/epc-test/abot_charm/functest-abot-epc-bundle/bundle.yaml',
+                                   'file_name': '/src/epc-test/'
+                                                'abot_charm/'
+                                                'functest-abot-'
+                                                'epc-bundle/bundle.yaml',
                                    'name': 'abot-oai-epc',
                                    'requirements': {'flavor':
                                                     {'name': 'm1.medium',
                                                      'ram_min': 4096}}}}
         with mock.patch('functest.opnfv_tests.vnf.epc.juju_epc.'
-                        'os.makedirs'), \
+                        'os.makedirs'),\
              mock.patch('functest.opnfv_tests.vnf.epc.juju_epc.'
                        'get_config', return_value={
                            'tenant_images': 'foo',
                            'orchestrator': self.orchestrator,
                            'vnf': self.vnf,
                            'vnf_test_suite': '',
-                           'version': 'whatever'}), \
-            mock.patch('functest.utils.openstack_utils.'
-                        'get_keystone_client', return_value='test'), \
-            mock.patch('functest.utils.openstack_utils.'
-                        'get_glance_client', return_value='test'), \
-            mock.patch('functest.utils.openstack_utils.'
-                        'get_neutron_client', return_value='test'), \
-            mock.patch('functest.utils.openstack_utils.'
+                           'version': 'whatever'}),\
+             mock.patch('functest.utils.openstack_utils.'
+                        'get_keystone_client', return_value='test'),\
+             mock.patch('functest.utils.openstack_utils.'
+                        'get_glance_client', return_value='test'),\
+             mock.patch('functest.utils.openstack_utils.'
+                        'get_neutron_client', return_value='test'),\
+             mock.patch('functest.utils.openstack_utils.'
                         'get_nova_client', return_value='test'):
 
             self.epc_vnf = juju_epc.JujuEpc()
