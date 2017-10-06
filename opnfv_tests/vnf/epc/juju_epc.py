@@ -6,6 +6,7 @@
 # are made available under the terms of the Apache License, Version 2.0
 # which accompanies this distribution, and is available at
 # http://www.apache.org/licenses/LICENSE-2.0
+"""Juju testcase implementation."""
 
 import logging
 import os
@@ -417,6 +418,7 @@ def sig_test_format(sig_test):
 
 
 def process_abot_test_result(file_path):
+    """ Process ABoT Result """
     with open(file_path) as test_result:
         data = json.load(test_result)
         res = []
@@ -428,12 +430,13 @@ def process_abot_test_result(file_path):
                     steps['result'] = steps['step_status']
                     res.append(steps)
             except:
-                raise
                 logging.error("Could not post data to ElasticSearch host")
+                raise
         return res
 
 
 def update_data(obj):
+    """ Update Result data"""
     try:
         obj['feature_file'] = os.path.splitext(os.path.basename(obj['uri']))[0]
 
@@ -471,6 +474,7 @@ def update_data(obj):
 
 
 def get_instance_metadata(nova_client, instance):
+    """ Get instance Metadata - Instance ID """
     try:
         instance = nova_client.servers.get(instance.id)
         return instance.metadata
