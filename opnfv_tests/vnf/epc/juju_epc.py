@@ -269,8 +269,8 @@ cloud.yaml".format(self.creds['auth_url'], self.case_dir)
                       'epc-basic/0:~/'.format(self.case_dir))
             self.__logger.info("Copying the feature files in Abot_node ")
             os.system("juju ssh abot-epc-basic/0 'sudo rsync -azvv "
-                      "~/featureFiles "
-                      "/etc/rebaca-test-suite/featureFiles'")
+                      "~/featureFiles /etc/rebaca-test-suite"
+                      "/featureFiles'")
             count = 0
             while count < 10:
                 epcstatus = os.system('juju status oai-epc | '
@@ -358,6 +358,9 @@ json'.format(self.case_dir))
             floating_ips = os_utils.get_floating_ips(self.neutron_client)
             tenant_id = os_utils.get_tenant_id(self.keystone_client,
                                                self.tenant_name)
+            self.__logger.info("USER ID : %s", user_id)
+            self.__logger.info("FLOATING IP : %s", floating_ips)
+            self.__logger.info("TENANT ID : %s", tenant_id)
             for item in floating_ips:
                 if item['tenant_id'] == tenant_id:
                     os_utils.delete_floating_ip(self.neutron_client,
