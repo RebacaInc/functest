@@ -9,6 +9,7 @@
 """Juju testcase implementation."""
 
 import logging
+import shutil
 import os
 import time
 import json
@@ -32,7 +33,7 @@ from snaps.openstack.tests import openstack_tests
 import functest.core.vnf as vnf
 
 __author__ = "Amarendra Meher <amarendra@rebaca.com>"
-
+__author__ = "Soumaya K Nayek <soumaya.nayek@rebaca.com>"
 
 class JujuEpc(vnf.VnfOnBoarding):
     """Abot EPC deployed with JUJU Orchestrator Case"""
@@ -131,10 +132,6 @@ cloud.yaml".format(self.creds['auth_url'], self.case_dir)
                                                      ['project_domain_name'],
                                                      self.case_dir)
             os.system(cmd)
-        os.system('apt-get -y install \
-                   {}'.format(self.orchestrator['requirements']['pip']))
-        os.system('pip3 install {}'.format(self.orchestrator
-                                           ['requirements']['pip3_packages']))
         self.__logger.info("Upload some OS images if it doesn't exist")
         for image_name, image_url in self.images.iteritems():
             self.__logger.info("image: %s, url: %s", image_name, image_url)
@@ -198,16 +195,21 @@ cloud.yaml".format(self.creds['auth_url'], self.case_dir)
         flavor_creator.create()
         self.created_object.append(flavor_creator)
         self.__logger.info("Installing Dependency Packages .......")
-        os.system('apt-get -y install {}'.format(self.orchestrator
-                                                 ['requirements']
-                                                 ['dep_package']))
-        os.system('add-apt-repository -y {}'.format(self.orchestrator
-                                                    ['requirements']
-                                                    ['repo_link']))
-        os.system('apt-get -y update')
-        os.system('apt-get -y install {}'.format(self.details
-                                                 ['orchestrator']
-                                                 ['name']))
+        source_dir = "/src/epc-requirements/juju_bin_build"
+        if os.path.exists(source_dir):
+            shutil.rmtree(source_dir)
+        os.mkdir(source_dir)
+        os.environ['GOPATH'] = str(source_dir)
+        os.environ['GOBIN'] = str(source_dir) + "/bin"
+        os.environ['PATH'] = (os.path.expandvars('$GOPATH')) + ":" + \
+                              (os.path.expandvars('$GOBIN')) + ":" +  \
+                              (os.path.expandvars('$PATH'))
+        os.system('go get -d -v github.com/juju/juju/...')
+        os.chdir(source_dir + "/src" + "/github.com" + "/juju" + "/juju")
+        os.system('git checkout tags/juju-2.2.5')
+        os.system('go get github.com/rogpeppe/godeps')
+        os.system('godeps -u dependencies.tsv')
+        os.system('go install -v github.com/juju/juju/...')
         self.__logger.info("Creating Cloud for Abot-epc .....")
         os.system('juju add-cloud abot-epc -f {}/abot_'
                   'epc_cloud.yaml'.format(self.case_dir))
@@ -326,20 +328,6 @@ json'.format(self.case_dir))
                 os.system('juju destroy-controller -y abot-controller '
                           '--destroy-all-models')
                 self.__logger.info("Uninstalling dependency packages...")
-                os.system('dpkg --configure -a')
-                os.system('apt-get -y remove {}'.format(self.details
-                                                        ['orchestrator']
-                                                        ['name']))
-                os.system('apt-get -y remove {}'.format(self.orchestrator
-                                                        ['requirements']
-                                                        ['dep_package']))
-                os.system('pip3 uninstall -y {}'.format(self.orchestrator
-                                                        ['requirements']
-                                                        ['pip3_packages']))
-                os.system('apt-get -y remove {}'.format(self.orchestrator
-                                                        ['requirements']
-                                                        ['pip']))
-                os.system('apt-get -y autoremove')
         except:
             self.__logger.warn("Some issue during the undeployment ..")
             self.__logger.warn("Tenant clean continue ..")
@@ -365,13 +353,13 @@ json'.format(self.case_dir))
                 if item['tenant_id'] == tenant_id:
                     os_utils.delete_floating_ip(self.neutron_client,
                                                 item['id'])
-            self.__logger.info("Cleaning Projects and Users")
-            if not self.exist_obj['tenant']:
-                os_utils.delete_tenant(self.keystone_client,
-                                       tenant_id)
-            if not self.exist_obj['user']:
-                os_utils.delete_user(self.keystone_client,
-                                     user_id)
+            #self.__logger.info("Cleaning Projects and Users")
+            #if not self.exist_obj['tenant']:
+            #    os_utils.delete_tenant(self.keystone_client,
+            #                           tenant_id)
+            #if not self.exist_obj['user']:
+            #    os_utils.delete_user(self.keystone_client,
+            #                         user_id)
 
         return True
 
