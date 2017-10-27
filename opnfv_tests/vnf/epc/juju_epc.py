@@ -29,11 +29,11 @@ from snaps.openstack.create_flavor import (FlavorSettings, OpenStackFlavor)
 from snaps.openstack.create_image import (ImageSettings, OpenStackImage)
 import pkg_resources
 from snaps.openstack.tests import openstack_tests
-
 import functest.core.vnf as vnf
 
 __author__ = "Amarendra Meher <amarendra@rebaca.com>"
 __author__ = "Soumaya K Nayek <soumaya.nayek@rebaca.com>"
+
 
 class JujuEpc(vnf.VnfOnBoarding):
     """Abot EPC deployed with JUJU Orchestrator Case"""
@@ -202,8 +202,8 @@ cloud.yaml".format(self.creds['auth_url'], self.case_dir)
         os.environ['GOPATH'] = str(source_dir)
         os.environ['GOBIN'] = str(source_dir) + "/bin"
         os.environ['PATH'] = (os.path.expandvars('$GOPATH')) + ":" + \
-                              (os.path.expandvars('$GOBIN')) + ":" +  \
-                              (os.path.expandvars('$PATH'))
+                             (os.path.expandvars('$GOBIN')) + ":" +  \
+                             (os.path.expandvars('$PATH'))
         os.system('go get -d -v github.com/juju/juju/...')
         os.chdir(source_dir + "/src" + "/github.com" + "/juju" + "/juju")
         os.system('git checkout tags/juju-2.2.5')
@@ -316,7 +316,7 @@ json'.format(self.case_dir))
     def clean(self):
         try:
             if not self.orchestrator['requirements']['preserve_setup']:
-                descriptor = self.vnf['descriptor']
+                # descriptor = self.vnf['descriptor']
                 self.__logger.info("Removing deployment files...")
                 os.system('rm {}'.format(self.case_dir + '/' +
                                          'TestResults.json'))
