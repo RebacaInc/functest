@@ -9,6 +9,7 @@
 """Juju testcase implementation."""
 
 import logging
+import shutil
 import os
 import time
 import json
@@ -194,20 +195,21 @@ cloud.yaml".format(self.creds['auth_url'], self.case_dir)
         flavor_creator.create()
         self.created_object.append(flavor_creator)
         self.__logger.info("Installing Dependency Packages .......")
-        path = os.path.expanduser('~') + "/build_juju"
-        os.mkdir(path)
-        os.environ['GOPATH'] = str(path)
-        os.environ['GOBIN'] = str(path) + "/bin"
+        source_dir = "/src/epc-requirements/juju_bin_build"
+        if os.path.exists(source_dir):
+            shutil.rmtree(source_dir)
+        os.mkdir(source_dir)
+        os.environ['GOPATH'] = str(source_dir)
+        os.environ['GOBIN'] = str(source_dir) + "/bin"
         os.environ['PATH'] = (os.path.expandvars('$GOPATH')) + ":" + \
                               (os.path.expandvars('$GOBIN')) + ":" +  \
                               (os.path.expandvars('$PATH'))
         os.system('go get -d -v github.com/juju/juju/...')
-        os.chdir(path + "/src" + "/github.com" + "/juju" + "/juju")
+        os.chdir(source_dir + "/src" + "/github.com" + "/juju" + "/juju")
         os.system('git checkout tags/juju-2.2.5')
         os.system('go get github.com/rogpeppe/godeps')
         os.system('godeps -u dependencies.tsv')
         os.system('go install -v github.com/juju/juju/...')
-        os.system('pip3 install juju-wait')
         self.__logger.info("Creating Cloud for Abot-epc .....")
         os.system('juju add-cloud abot-epc -f {}/abot_'
                   'epc_cloud.yaml'.format(self.case_dir))
@@ -324,20 +326,6 @@ json'.format(self.case_dir))
                 os.system('juju destroy-controller -y abot-controller '
                           '--destroy-all-models')
                 self.__logger.info("Uninstalling dependency packages...")
-                os.system('dpkg --configure -a')
-                os.system('apt-get -y remove {}'.format(self.details
-                                                        ['orchestrator']
-                                                        ['name']))
-                os.system('apt-get -y remove {}'.format(self.orchestrator
-                                                        ['requirements']
-                                                        ['dep_package']))
-                os.system('pip3 uninstall -y {}'.format(self.orchestrator
-                                                        ['requirements']
-                                                        ['pip3_packages']))
-                os.system('apt-get -y remove {}'.format(self.orchestrator
-                                                        ['requirements']
-                                                        ['pip']))
-                os.system('apt-get -y autoremove')
         except:
             self.__logger.warn("Some issue during the undeployment ..")
             self.__logger.warn("Tenant clean continue ..")
