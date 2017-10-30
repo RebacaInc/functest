@@ -23,7 +23,7 @@ vnf:
         version: '1'
     requirements:
         flavor:
-          name: debayan_flavor_1
+          name: m1.large
           ram_min: 4096
 vnf_test_suite:
     name: abot-epc-basic
