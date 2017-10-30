@@ -133,15 +133,15 @@ cloud.yaml".format(self.creds['auth_url'], self.case_dir)
                                                      self.case_dir)
             os.system(cmd)
         self.__logger.info("Upload some OS images if it doesn't exist")
-        for image_name, image_url in self.images.iteritems():
-            self.__logger.info("image: %s, url: %s", image_name, image_url)
-            if image_url and image_name:
+        for image_name, image_file in self.images.iteritems():
+            self.__logger.info("image: %s, file: %s", image_name, image_file)
+            if image_file and image_name:
                 image_creator = OpenStackImage(
                     self.snaps_creds,
                     ImageSettings(name=image_name,
                                   image_user='cloud',
                                   img_format='qcow2',
-                                  url=image_url))
+                                  image_file=image_file))
                 image_creator.create()
                 self.created_object.append(image_creator)
 
@@ -216,7 +216,7 @@ cloud.yaml".format(self.creds['auth_url'], self.case_dir)
         os.system('juju add-credential abot-epc -f {}/abot'
                   '_epc_credential.yaml'.format(self.
                                                 case_dir))
-        for image_name, image_url in self.images.iteritems():
+        for image_name in self.images.keys():
             self.__logger.info("Generating Metadata for %s", image_name)
             image_id = os_utils.get_image_id(self.glance_client, image_name)
             os.system('juju metadata generate-image -d ~ -i {} -s {} -r '
@@ -318,8 +318,8 @@ json'.format(self.case_dir))
             if not self.orchestrator['requirements']['preserve_setup']:
                 # descriptor = self.vnf['descriptor']
                 self.__logger.info("Removing deployment files...")
-                os.system('rm {}'.format(self.case_dir + '/' +
-                                         'TestResults.json'))
+                os.system('rm -f -- {}'.format(self.case_dir + '/' +
+                                               'TestResults.json'))
                 os.system("sed -i '/project-domain-name/Q' {}/abot_epc"
                           "_credential.yaml".format(self.case_dir))
                 self.__logger.info("Destroying Orchestrator...")
@@ -352,13 +352,12 @@ json'.format(self.case_dir))
                     os_utils.delete_floating_ip(self.neutron_client,
                                                 item['id'])
             self.__logger.info("Cleaning Projects and Users")
-            if not self.exist_obj['tenant']:
-                os_utils.delete_tenant(self.keystone_client,
-                                       tenant_id)
-            if not self.exist_obj['user']:
-                os_utils.delete_user(self.keystone_client,
-                                     user_id)
-
+            # if not self.exist_obj['tenant']:
+            #    os_utils.delete_tenant(self.keystone_client,
+            #                           tenant_id)
+            # if not self.exist_obj['user']:
+            #    os_utils.delete_user(self.keystone_client,
+            #                         user_id)
         return True
 
 
