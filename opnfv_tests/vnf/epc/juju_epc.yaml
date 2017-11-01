@@ -7,12 +7,9 @@ orchestrator:
     version: '2.0'
     requirements:
         dep_package: 'software-properties-common'
-        pip: 'python3-pip'
-        repo_link: 'ppa:juju/stable'
         flavor:
           name: m1.small
           ram_min: 2048
-        pip3_packages: juju-wait
         preserve_setup: false
 vnf:
     name: juju_epc
@@ -23,7 +20,7 @@ vnf:
         version: '1'
     requirements:
         flavor:
-          name: m1.large
+          name: m1.medium
           ram_min: 4096
 vnf_test_suite:
     name: abot-epc-basic
