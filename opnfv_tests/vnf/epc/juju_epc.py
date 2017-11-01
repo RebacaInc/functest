@@ -352,12 +352,12 @@ json'.format(self.case_dir))
                     os_utils.delete_floating_ip(self.neutron_client,
                                                 item['id'])
             self.__logger.info("Cleaning Projects and Users")
-            # if not self.exist_obj['tenant']:
-            #    os_utils.delete_tenant(self.keystone_client,
-            #                           tenant_id)
-            # if not self.exist_obj['user']:
-            #    os_utils.delete_user(self.keystone_client,
-            #                         user_id)
+            if not self.exist_obj['tenant']:
+                os_utils.delete_tenant(self.keystone_client,
+                                       tenant_id)
+            if not self.exist_obj['user']:
+                os_utils.delete_user(self.keystone_client,
+                                     user_id)
         return True
 
 
