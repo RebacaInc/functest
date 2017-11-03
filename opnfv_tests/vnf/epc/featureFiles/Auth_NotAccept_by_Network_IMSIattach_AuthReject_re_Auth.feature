@@ -18,7 +18,7 @@
     Given the execution is paused for {abotprop.WAIT_10_SEC} seconds
     Then the ending steps are complete
 
-    # set ABOT configuration 		
+    # set ABOT configuration
     Given that I setup S1AP Simulator with default parameters specified in {abotprop.ABOT.EPC.Defaults} on node ABOT
     Given that I setup S1AP Simulator with USIM parameter "ABOT.UE.USIM.AttachWithImsi=true" on node ABOT
     # set the value of RES parameter (other than 0x00) manually in Authentication Response message which is sent from UE to MME
@@ -27,8 +27,8 @@
     # Execute ABOT S1AP Simulator
     When I run S1AP simulator on node ABOT with 1 UE
 
-    Given the execution is paused for {abotprop.WAIT_10_SEC} seconds 
-    Given the execution is paused for {abotprop.WAIT_10_SEC} seconds 
+    Given the execution is paused for {abotprop.WAIT_10_SEC} seconds
+    Given the execution is paused for {abotprop.WAIT_10_SEC} seconds
 
     # Validate Test Case Execution at Simulator
     Then I receive S1AP response on node ABOT and verify the presence of all the following values:

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2016 Orange and others.
+# Copyright (c) 2016 Rebaca and others.
 #
 # All rights reserved. This program and the accompanying materials
 # are made available under the terms of the Apache License, Version 2.0
@@ -98,18 +98,16 @@ class JujuEpc(vnf.VnfOnBoarding):
         """Prepare testcase (Additional pre-configuration steps)."""
         self.__logger.debug("OS Credentials: %s", os_utils.get_credentials())
 
-        if os_utils.get_credentials()['project_name'] == self.tenant_name:
-            self.creds = {
-                "tenant": self.tenant_name,
-                "username": os_utils.get_credentials()['username'],
-                "password": os_utils.get_credentials()['password'],
-                "auth_url": os_utils.get_credentials()['auth_url']
-            }
-        else:
-            super(JujuEpc, self).prepare()
+        super(JujuEpc, self).prepare()
 
-        self.__logger.debug("Self Creds: %s", self.creds)
         self.__logger.info("Additional pre-configuration steps")
+
+        self.creds = {
+            "tenant": self.tenant_name,
+            "username": self.tenant_name,
+            "password": self.tenant_name,
+            "auth_url": os_utils.get_credentials()['auth_url']
+            }
 
         self.snaps_creds = OSCreds(
             username=self.creds['username'],
@@ -254,7 +252,7 @@ cloud.yaml".format(self.creds['auth_url'], self.case_dir)
         self.__logger.info("juju wait completed: %s", status)
         self.__logger.info("Deployed Abot-epc on Openstack")
         if status == 0:
-            instances = self.nova_client.servers.list()
+            instances = os_utils.get_instances(self.nova_client)
             for items in instances:
                 metadata = get_instance_metadata(self.nova_client, items)
                 if 'juju-units-deployed' in metadata:
@@ -316,7 +314,6 @@ json'.format(self.case_dir))
     def clean(self):
         try:
             if not self.orchestrator['requirements']['preserve_setup']:
-                # descriptor = self.vnf['descriptor']
                 self.__logger.info("Removing deployment files...")
                 os.system('rm -f -- {}'.format(self.case_dir + '/' +
                                                'TestResults.json'))
@@ -352,12 +349,8 @@ json'.format(self.case_dir))
                     os_utils.delete_floating_ip(self.neutron_client,
                                                 item['id'])
             self.__logger.info("Cleaning Projects and Users")
-            # if not self.exist_obj['tenant']:
-            #    os_utils.delete_tenant(self.keystone_client,
-            #                           tenant_id)
-            # if not self.exist_obj['user']:
-            #    os_utils.delete_user(self.keystone_client,
-            #                         user_id)
+            super(JujuEpc, self).clean()
+
         return True
 
 

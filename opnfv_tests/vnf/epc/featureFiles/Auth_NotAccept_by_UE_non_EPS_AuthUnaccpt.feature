@@ -3,7 +3,7 @@
     ############################################################################################################################
 
 
-    Feature:Auth_NotAccept_by_UE_non_EPS_AuthUnaccpt  
+    Feature:Auth_NotAccept_by_UE_non_EPS_AuthUnaccpt
 
     @authentication-procedure @Auth_NotAccept_by_UE_non_EPS_AuthUnaccpt @TS_24_301 @24_301_5_4_2_6 @24_301_5_4_2_7 @negTCs @Series-0004 @SS_changesReqd
 
@@ -19,10 +19,10 @@
     When I run the SSH command "sudo service mme_gw restart" on node MME
     Given that I setup S1AP Simulator with UE parameter "ABOT.UE.CONFIG.SECURITY.SYNC_FAILURE=false" on node ABOT
     Given that I setup S1AP Simulator with USIM parameter "ABOT.UE.USIM.AttachWithImsi=true" on node ABOT
-    Given the execution is paused for {abotprop.WAIT_10_SEC} seconds   
+    Given the execution is paused for {abotprop.WAIT_10_SEC} seconds
     Then the ending steps are complete
 
-    # set ABOT configuration 		
+    # set ABOT configuration
     Given that I setup S1AP Simulator with default parameters specified in {abotprop.ABOT.EPC.Defaults} on node ABOT
     Given that I setup S1AP Simulator with UE parameter "ABOT.UE.CONFIG.SECURITY.SYNC_FAILURE=true" on node ABOT
     Given that I setup S1AP Simulator with USIM parameter "ABOT.UE.USIM.AttachWithImsi=false" on node ABOT
@@ -30,7 +30,7 @@
     # Execute ABOT S1AP Simulator
     When I run S1AP simulator on node ABOT with 1 UE
 
-    Given the execution is paused for {abotprop.WAIT_10_SEC} seconds 
+    Given the execution is paused for {abotprop.WAIT_10_SEC} seconds
     Given the execution is paused for {abotprop.WAIT_10_SEC} seconds
 
     # Validate Test Case Execution at Simulator

@@ -5,7 +5,7 @@
 Feature:  Attach Procedure With IM CN Subsystem Signalling Flag Indication in PCO
 
 @attach-procedure @TS_24_301 @24_301_5_5 @24_301_5_5_1_2_2 @TS_24_368 @24_368_4 @24_368-5_4 @Series-0000
-@TS_36_523_9_2_1_1_3 @Attach_Procedure_IM_CN_Subsystem_Signalling_Flag @PCO 
+@TS_36_523_9_2_1_1_3 @Attach_Procedure_IM_CN_Subsystem_Signalling_Flag @PCO
 
 Scenario: Attach Procedure indicating IM CN Subsystem Signalling Flag in the protocol configuration options
 

@@ -5,7 +5,7 @@
 Feature:  Attach Procedure with IPv4 Address Allocation Via DHCPv4 Indication in PCO
 
 @attach-procedure @TS_24_301 @24_301_5_5 @24_301_5_5_1_2_2 @TS_24_368 @24_368_4 @24_368-5_4 @Series-0000
-@TS_36_523_9_2_1_1_3 @Attach_Procedure_IPv4_Address_Allocation_Via_DHCPv4 @PCO 
+@TS_36_523_9_2_1_1_3 @Attach_Procedure_IPv4_Address_Allocation_Via_DHCPv4 @PCO
 
 Scenario: Attach Procedure indicating IPv4 address allocation via DHCPv4 in the protocol configuration options
 

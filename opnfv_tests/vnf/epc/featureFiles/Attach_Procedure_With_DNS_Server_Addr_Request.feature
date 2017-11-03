@@ -2,10 +2,10 @@
 #                                              Date: <22/08/2016> Version: <1.1>                                           #
 ############################################################################################################################
 
-Feature:  Attach Procedure With DNS Server Address Request Indication in PCO 
+Feature:  Attach Procedure With DNS Server Address Request Indication in PCO
 
 @attach-procedure  @TS_24_301 @24_301_5_5 @24_301_5_5_1_2_2 @TS_24_368 @24_368_4 @24_368-5_4 @Series-0000
-@TS_36_523_9_2_1_1_3 @Attach_Procedure_DNS_Server_Address_Request @PCO 
+@TS_36_523_9_2_1_1_3 @Attach_Procedure_DNS_Server_Address_Request @PCO
 
 Scenario: Attach Procedure indicating a request DNS Server Address in the protocol configuration options
 

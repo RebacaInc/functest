@@ -5,7 +5,7 @@
 Feature:  Attach Procedure With P-CSCF Address Request Indication in PCO
 
 @attach-procedure @TS_24_301 @24_301_5_5 @24_301_5_5_1_2_2 @TS_24_368 @24_368_4 @24_368-5_4 @Series-0000
-@TS_36_523_9_2_1_1_3 @Attach_Procedure_P-CSCF_Address_Request @PCO 
+@TS_36_523_9_2_1_1_3 @Attach_Procedure_P-CSCF_Address_Request @PCO
 
 Scenario: Attach Procedure indicating a request for P-CSCF address  in the protocol configuration options
 

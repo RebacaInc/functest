@@ -13,7 +13,7 @@ Given all configured endpoints for SSH are connected successfully
 Given the steps below will be executed at the end
 When I stop S1AP simulator on node ABOT
 When I run the SSH command "sudo service mme_gw restart" on node MME
-Given the execution is paused for {abotprop.WAIT_10_SEC} seconds    
+Given the execution is paused for {abotprop.WAIT_10_SEC} seconds
 Then the ending steps are complete
 
 # set ABOT configuration
