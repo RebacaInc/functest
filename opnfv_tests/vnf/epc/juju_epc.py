@@ -351,8 +351,11 @@ class JujuEpc(vnf.VnfOnBoarding):
                     os_utils.delete_floating_ip(self.neutron_client,
                                                 item['id'])
             self.__logger.info("Cleaning Projects and Users")
-            super(JujuEpc, self).clean()
-
+            for creator in reversed(self.created_object):
+                try:
+                    creator.clean()
+                except Exception as exc:  # pylint: disable=broad-except
+                    self.__logger.error('Unexpected error cleaning - %s', exc)
         return True
 
 
