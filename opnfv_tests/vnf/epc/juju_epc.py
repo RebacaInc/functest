@@ -116,19 +116,20 @@ class JujuEpc(vnf.VnfOnBoarding):
             project_name=self.creds['tenant'],
             identity_api_version=int(os_utils.get_keystone_client_version()))
 
-        cmd = "sed -i 's#endpoint:.*#endpoint: {}#g' {}/abot_epc_\
-cloud.yaml".format(self.creds['auth_url'], self.case_dir)
+        cmd = ("sed -i 's#endpoint:.*#endpoint: {}#g' {}/abot_epc_"
+               "cloud.yaml".format(self.creds['auth_url'],
+                                   self.case_dir))
         os.system(cmd)
         if self.snaps_creds.identity_api_version == 3:
-            cmd = "sed -i '/username/a\      user-domain-name: {}' {}/abot_" \
-                  "epc_credential.yaml".format(os_utils.get_credentials()
-                                               ['user_domain_name'],
-                                               self.case_dir)
+            cmd = ("sed -i '/username/a\      user-domain-name: {}' {}/abot_"
+                   "epc_credential.yaml".format(os_utils.get_credentials()
+                                                ['user_domain_name'],
+                                                self.case_dir))
             os.system(cmd)
-            cmd = "sed -i '/username/a\      project-domain-name: {}' {}" \
-                  "/abot_epc_credential.yaml".format(os_utils.get_credentials()
+            cmd = ("sed -i '/username/a\      project-domain-name: {}' {}"
+                   "/abot_epc_credential.yaml".format(os_utils.get_credentials()
                                                      ['project_domain_name'],
-                                                     self.case_dir)
+                                                     self.case_dir))
             os.system(cmd)
         self.__logger.info("Upload some OS images if it doesn't exist")
         for image_name, image_file in self.images.iteritems():
@@ -199,9 +200,9 @@ cloud.yaml".format(self.creds['auth_url'], self.case_dir)
         os.makedirs(source_dir)
         os.environ['GOPATH'] = str(source_dir)
         os.environ['GOBIN'] = str(source_dir) + "/bin"
-        os.environ['PATH'] = (os.path.expandvars('$GOPATH')) + ":" + \
-                             (os.path.expandvars('$GOBIN')) + ":" +  \
-                             (os.path.expandvars('$PATH'))
+        os.environ['PATH'] = ((os.path.expandvars('$GOPATH')) + ":" +
+                             (os.path.expandvars('$GOBIN')) + ":" +
+                             (os.path.expandvars('$PATH')))
         os.system('go get -d -v github.com/juju/juju/...')
         os.chdir(source_dir + "/src" + "/github.com" + "/juju" + "/juju")
         os.system('git checkout tags/juju-2.2.5')
@@ -223,12 +224,12 @@ cloud.yaml".format(self.creds['auth_url'], self.case_dir)
                                                self.creds['auth_url']))
         net_id = os_utils.get_network_id(self.neutron_client, private_net_name)
         self.__logger.info("Credential information  : %s", net_id)
-        juju_bootstrap_command = 'juju bootstrap abot-epc abot-controller ' \
-                                 '--config network={} --metadata-source ~  ' \
-                                 '--constraints mem=2G --bootstrap-series ' \
-                                 'trusty ' \
-                                 '--config use-floating-ip=true'. \
-            format(net_id)
+        juju_bootstrap_command = ('juju bootstrap abot-epc abot-controller ' 
+                                 '--config network={} --metadata-source ~  ' 
+                                 '--constraints mem=2G --bootstrap-series ' 
+                                 'trusty ' 
+                                 '--config use-floating-ip=true'.
+            format(net_id))
         os.system(juju_bootstrap_command)
         return True
 
@@ -256,8 +257,8 @@ cloud.yaml".format(self.creds['auth_url'], self.case_dir)
             for items in instances:
                 metadata = get_instance_metadata(self.nova_client, items)
                 if 'juju-units-deployed' in metadata:
-                    sec_group = 'juju-' + metadata['juju-controller-uuid'] + \
-                                '-' + metadata['juju-model-uuid']
+                    sec_group = ('juju-' + metadata['juju-controller-uuid'] +
+                                '-' + metadata['juju-model-uuid'])
                     self.sec_group_id = os_utils.get_security_group_id(
                         self.neutron_client, sec_group)
                     break
@@ -274,7 +275,8 @@ cloud.yaml".format(self.creds['auth_url'], self.case_dir)
             count = 0
             while count < 10:
                 epcstatus = os.system('juju status oai-epc | '
-                                      'grep OAI\ EPC\ is\ running')
+                                      'grep {} | grep {} | grep {}'
+                                      .format('EPC', 'is', 'running'))
                 if epcstatus == 0:
                     break
                 else:
@@ -297,8 +299,8 @@ cloud.yaml".format(self.creds['auth_url'], self.case_dir)
                   'epc-basic/artifacts/TestResults.json {}/.'
                   .format(self.case_dir))
         self.__logger.info("Parsing the Test results...")
-        res = process_abot_test_result('{}/TestResults.\
-json'.format(self.case_dir))
+        res = (process_abot_test_result('{}/TestResults.'
+                                        'json'.format(self.case_dir)))
         short_result = sig_test_format(res)
         self.__logger.info(short_result)
         self.details['test_vnf'].update(status='PASS',
@@ -306,8 +308,8 @@ json'.format(self.case_dir))
                                         full_result=res,
                                         duration=duration)
 
-        self.__logger.info("Test VNF result: Passed: %d, Failed:\
-%d, Skipped: %d", short_result['passed'],
+        self.__logger.info("Test VNF result: Passed: %d, Failed:"
+                           "%d, Skipped: %d", short_result['passed'],
                            short_result['failures'], short_result['skipped'])
         return True
 
