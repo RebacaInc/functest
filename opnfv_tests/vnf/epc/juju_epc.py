@@ -116,21 +116,33 @@ class JujuEpc(vnf.VnfOnBoarding):
             project_name=self.creds['tenant'],
             identity_api_version=int(os_utils.get_keystone_client_version()))
 
-        cmd = ("sed -i 's#endpoint:.*#endpoint: {}#g' {}/abot_epc_"
-               "cloud.yaml".format(self.creds['auth_url'],
-                                   self.case_dir))
-        os.system(cmd)
+        self.cloud_data = {
+            'url' = self.creds['auth_url'],
+            'key' = self.tenant_name,
+            'tenant_n' = self.tenant_name,
+            'user_n' = self.tenant_name
+        }
+        filename = os.path.join(self.case_dir, 'abot-epc.yaml')
+        self.__logger.info("file to create : %s", filename)
+        self.writeConfig(filename, cloud_template, **cloud_data)
+        #cmd = ("sed -i 's#endpoint:.*#endpoint: {}#g' {}/abot_epc_"
+        #       "cloud.yaml".format(self.creds['auth_url'],
+        #                           self.case_dir))
+        #os.system(cmd)
         if self.snaps_creds.identity_api_version == 3:
-            cmd = ("sed -i '/username/a\      user-domain-name: {}' {}/abot_"
-                   "epc_credential.yaml".format(os_utils.get_credentials()
-                                                ['user_domain_name'],
-                                                self.case_dir))
-            os.system(cmd)
-            cmd = ("sed -i '/username/a\      project-domain-name: {}' {}"
-                   "/abot_epc_credential.yaml".format
-                   (os_utils.get_credentials()
-                    ['project_domain_name'], self.case_dir))
-            os.system(cmd)
+            self.appendConfig(filename, '{}', '{}'.format(
+            os_utils.get_credentials()['project_domain_name'],
+            os_utils.get_credentials()['user_domain_name']))
+            #cmd = ("sed -i '/username/a\      user-domain-name: {}' {}/abot_"
+            #       "epc_credential.yaml".format(os_utils.get_credentials()
+            #                                    ['user_domain_name'],
+            #                                    self.case_dir))
+            #os.system(cmd)
+            #cmd = ("sed -i '/username/a\      project-domain-name: {}' {}"
+            #       "/abot_epc_credential.yaml".format
+            #       (os_utils.get_credentials()
+            #        ['project_domain_name'], self.case_dir))
+            #os.system(cmd)
         self.__logger.info("Upload some OS images if it doesn't exist")
         for image_name, image_file in self.images.iteritems():
             self.__logger.info("image: %s, file: %s", image_name, image_file)
@@ -467,3 +479,35 @@ def get_instance_metadata(nova_client, instance):
     except Exception as e:
         logging.error("Error [get_instance_status(nova_client)]: %s" % e)
         return None
+
+cloud_template = """clouds:
+    abot-epc:
+      type: openstack
+      auth-types: [userpass]
+      endpoint: {url}
+      regions:
+        RegionOne:
+          endpoint: {url}
+credentials:
+  abot-epc:
+    abot-epc:
+      auth-type: userpass
+      password: {pass}
+      tenant-name: {tenant_n}
+      username: {user_n}"""
+
+# def writeConfig(**kwargs):
+#    with open('cloud.yaml', 'w') as yfile:
+#        yfile.write(cloud_template.format(**kwargs))
+
+def writeConfig(fname, template, **kwargs):
+    with open(fname, 'w') as yfile:
+        yfile.write(template.format(**kwargs))
+def appendConfig(file_name, p_domain, u_domain):
+    with open(file_name) as yfile:
+        doc = yaml.load(yfile)
+    doc['credentials']['abot-epc']['abot-epc']['project-domain-name'] = p_domain
+    doc['credentials']['abot-epc']['abot-epc']['user-domain-name'] = u_domain
+
+    with open(file_name, 'w') as yfile:
+        yaml.safe_dump(doc, yfile, default_flow_style=False)
