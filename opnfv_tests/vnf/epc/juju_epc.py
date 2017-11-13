@@ -16,10 +16,12 @@ import json
 import sys
 from copy import deepcopy
 import yaml
-
-from functest.utils.constants import CONST
 import functest.utils.openstack_utils as os_utils
+import functest.core.vnf as vnf
+import pkg_resources
+
 from functest.opnfv_tests.openstack.snaps import snaps_utils
+from functest.utils.constants import CONST
 
 from snaps.openstack.os_credentials import OSCreds
 from snaps.openstack.create_network import (NetworkSettings,
@@ -27,9 +29,7 @@ from snaps.openstack.create_network import (NetworkSettings,
 from snaps.openstack.create_router import (RouterSettings, OpenStackRouter)
 from snaps.openstack.create_flavor import (FlavorSettings, OpenStackFlavor)
 from snaps.openstack.create_image import (ImageSettings, OpenStackImage)
-import pkg_resources
 from snaps.openstack.tests import openstack_tests
-import functest.core.vnf as vnf
 
 __author__ = "Amarendra Meher <amarendra@rebaca.com>"
 __author__ = "Soumaya K Nayek <soumaya.nayek@rebaca.com>"
@@ -117,32 +117,21 @@ class JujuEpc(vnf.VnfOnBoarding):
             identity_api_version=int(os_utils.get_keystone_client_version()))
 
         cloud_data = {
-            'url' : self.creds['auth_url'],
-            'pass' : self.tenant_name,
-            'tenant_n' : self.tenant_name,
-            'user_n' : self.tenant_name
+            'url': self.creds['auth_url'],
+            'pass': self.tenant_name,
+            'tenant_n': self.tenant_name,
+            'user_n': self.tenant_name
         }
-        filename = os.path.join(self.case_dir, 'abot-epc.yaml')
-        self.__logger.info("Cretae  %s to add cloud info", filename)
-        writeConfig(filename, cloud_template, **cloud_data)
-        #cmd = ("sed -i 's#endpoint:.*#endpoint: {}#g' {}/abot_epc_"
-        #       "cloud.yaml".format(self.creds['auth_url'],
-        #                           self.case_dir))
-        #os.system(cmd)
+        self.filename = os.path.join(self.case_dir, 'abot-epc.yaml')
+        self.__logger.info("Cretae  %s to add cloud info", self.filename)
+        write_config(self.filename, CLOUD_TEMPLATE, **cloud_data)
+
         if self.snaps_creds.identity_api_version == 3:
-            appendConfig(filename, '{}'.format(
-            os_utils.get_credentials()['project_domain_name']),
-            '{}'.format(os_utils.get_credentials()['user_domain_name']))
-            #cmd = ("sed -i '/username/a\      user-domain-name: {}' {}/abot_"
-            #       "epc_credential.yaml".format(os_utils.get_credentials()
-            #                                    ['user_domain_name'],
-            #                                    self.case_dir))
-            #os.system(cmd)
-            #cmd = ("sed -i '/username/a\      project-domain-name: {}' {}"
-            #       "/abot_epc_credential.yaml".format
-            #       (os_utils.get_credentials()
-            #        ['project_domain_name'], self.case_dir))
-            #os.system(cmd)
+            append_config(self.filename, '{}'.format(
+                os_utils.get_credentials()['project_domain_name']),
+                          '{}'.format(os_utils.get_credentials()
+                                      ['user_domain_name']))
+
         self.__logger.info("Upload some OS images if it doesn't exist")
         for image_name, image_file in self.images.iteritems():
             self.__logger.info("image: %s, file: %s", image_name, image_file)
@@ -181,11 +170,7 @@ class JujuEpc(vnf.VnfOnBoarding):
         network_creator.create()
         self.created_object.append(network_creator)
 
-        if ext_net_name:
-            self.__logger.info("External network name %s", ext_net_name)
-        else:
-            ext_net_name = snaps_utils.get_ext_net_name(self.snaps_creds)
-
+        ext_net_name = snaps_utils.get_ext_net_name(self.snaps_creds)
         self.__logger.info("Creating network Router ....")
         router_creator = OpenStackRouter(
             self.snaps_creds,
@@ -222,8 +207,8 @@ class JujuEpc(vnf.VnfOnBoarding):
         os.system('godeps -u dependencies.tsv')
         os.system('go install -v github.com/juju/juju/...')
         self.__logger.info("Creating Cloud for Abot-epc .....")
-        os.system('juju add-cloud abot-epc -f {}'.format(filename))
-        os.system('juju add-credential abot-epc -f {}'.format(filename))
+        os.system('juju add-cloud abot-epc -f {}'.format(self.filename))
+        os.system('juju add-credential abot-epc -f {}'.format(self.filename))
         for image_name in self.images.keys():
             self.__logger.info("Generating Metadata for %s", image_name)
             image_id = os_utils.get_image_id(self.glance_client, image_name)
@@ -327,14 +312,11 @@ class JujuEpc(vnf.VnfOnBoarding):
             if not self.orchestrator['requirements']['preserve_setup']:
                 self.__logger.info("Removing deployment files...")
                 testresult = os.path.join(self.case_dir, 'TestResults.json')
-                #os.system('rm -f -- {}'.format(self.case_dir + '/' +
-                #                               'TestResults.json'))
-                self.__logger.info("Removing %s file", testresult)
                 if os.path.exists(testresult):
                     os.remove(testresult)
-                self.__logger.info("Removing %s file ", filename)
-                if os.path.exists(filename):
-                    os.remove(filename)
+                self.__logger.info("Removing %s file ", self.filename)
+                if os.path.exists(self.filename):
+                    os.remove(self.filename)
                 self.__logger.info("Destroying Orchestrator...")
                 os.system('juju destroy-controller -y abot-controller '
                           '--destroy-all-models')
@@ -351,13 +333,11 @@ class JujuEpc(vnf.VnfOnBoarding):
                     self.__logger.error('Unexpected error cleaning - %s', exc)
 
             self.__logger.info("Releasing all the floating IPs")
-            user_id = os_utils.get_user_id(self.keystone_client,
-                                           self.tenant_name)
+            # user_id = os_utils.get_user_id(self.keystone_client,
+            #                               self.tenant_name)
             floating_ips = os_utils.get_floating_ips(self.neutron_client)
             tenant_id = os_utils.get_tenant_id(self.keystone_client,
                                                self.tenant_name)
-            self.__logger.info("USER ID : %s", user_id)
-            self.__logger.info("FLOATING IP : %s", floating_ips)
             self.__logger.info("TENANT ID : %s", tenant_id)
             for item in floating_ips:
                 if item['tenant_id'] == tenant_id:
@@ -481,7 +461,8 @@ def get_instance_metadata(nova_client, instance):
         logging.error("Error [get_instance_status(nova_client)]: %s" % e)
         return None
 
-cloud_template = """clouds:
+
+CLOUD_TEMPLATE = """clouds:
     abot-epc:
       type: openstack
       auth-types: [userpass]
@@ -497,18 +478,21 @@ credentials:
       tenant-name: {tenant_n}
       username: {user_n}"""
 
-# def writeConfig(**kwargs):
-#    with open('cloud.yaml', 'w') as yfile:
-#        yfile.write(cloud_template.format(**kwargs))
 
-def writeConfig(fname, template, **kwargs):
+def write_config(fname, template, **kwargs):
+    """ Generate yaml from template for addinh cloud in juju """
     with open(fname, 'w') as yfile:
         yfile.write(template.format(**kwargs))
-def appendConfig(file_name, p_domain, u_domain):
+
+
+def append_config(file_name, p_domain, u_domain):
+    """ Append values into a yaml file  """
     with open(file_name) as yfile:
         doc = yaml.load(yfile)
-    doc['credentials']['abot-epc']['abot-epc']['project-domain-name'] = p_domain
-    doc['credentials']['abot-epc']['abot-epc']['user-domain-name'] = u_domain
+    doc['credentials']['abot-epc']['abot-epc']['project-domain-name'] = (
+        p_domain)
+    doc['credentials']['abot-epc']['abot-epc']['user-domain-name'] = (
+        u_domain)
 
     with open(file_name, 'w') as yfile:
         yaml.safe_dump(doc, yfile, default_flow_style=False)
