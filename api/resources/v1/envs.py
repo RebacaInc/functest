@@ -10,35 +10,39 @@
 Resources to handle environment related requests
 """
 
+import pkg_resources
+import socket
+
 import IPy
 from flask import jsonify
+from flasgger.utils import swag_from
 
 from functest.api.base import ApiResource
 from functest.api.common import api_utils
 from functest.cli.commands.cli_env import Env
-import functest.utils.functest_utils as ft_utils
+
+ADDRESS = socket.gethostbyname(socket.gethostname())
+ENDPOINT_ENVS = ('http://{}:5000/api/v1/functest/envs'.format(ADDRESS))
 
 
 class V1Envs(ApiResource):
     """ V1Envs Resource class"""
 
+    @swag_from(
+        pkg_resources.resource_filename('functest', 'api/swagger/envs.yaml'),
+        endpoint=ENDPOINT_ENVS)
     def get(self):  # pylint: disable=no-self-use
         """ Get environment """
         environment_show = Env().show()
         return jsonify(environment_show)
 
+    @swag_from(
+        pkg_resources.resource_filename('functest',
+                                        'api/swagger/envs_action.yaml'),
+        endpoint='{0}/action'.format(ENDPOINT_ENVS))
     def post(self):
         """ Used to handle post request """
         return self._dispatch_post()
-
-    def prepare(self, args):  # pylint: disable=no-self-use, unused-argument
-        """ Prepare environment """
-        try:
-            ft_utils.execute_command("prepare_env start")
-        except Exception as err:  # pylint: disable=broad-except
-            return api_utils.result_handler(status=1, data=str(err))
-        return api_utils.result_handler(
-            status=0, data="Prepare env successfully")
 
     def update_hosts(self, hosts_info):  # pylint: disable=no-self-use
         """ Update hosts info """

@@ -5,6 +5,8 @@
 # which accompanies this distribution, and is available at
 # http://www.apache.org/licenses/LICENSE-2.0
 
+# pylint: disable=missing-docstring,protected-access,invalid-name
+
 import json
 import logging
 import os
@@ -14,40 +16,33 @@ import mock
 
 from functest.core import testcase
 from functest.opnfv_tests.openstack.rally import rally
-from functest.utils.constants import CONST
+
+from snaps.openstack.os_credentials import OSCreds
 
 
 class OSRallyTesting(unittest.TestCase):
-    @mock.patch('functest.opnfv_tests.openstack.rally.rally.os_utils.'
-                'get_nova_client', return_value=mock.Mock())
-    @mock.patch('functest.opnfv_tests.openstack.rally.rally.os_utils.'
-                'get_neutron_client', return_value=mock.Mock())
-    @mock.patch('functest.opnfv_tests.openstack.rally.rally.os_utils.'
-                'get_cinder_client', return_value=mock.Mock())
-    def setUp(self, mock_func1, mock_func2, mock_func3):
-        self.rally_base = rally.RallyBase()
-        self.rally_base.network_dict['net_id'] = 'test_net_id'
-        self.polling_iter = 2
-        mock_func1.assert_called()
-        mock_func2.assert_called()
-        mock_func3.assert_called()
+    # pylint: disable=too-many-public-methods
+    def setUp(self):
+        os_creds = OSCreds(
+            username='user', password='pass',
+            auth_url='http://foo.com:5000/v3', project_name='bar')
+        with mock.patch('functest.opnfv_tests.openstack.snaps.snaps_utils.'
+                        'get_credentials',
+                        return_value=os_creds) as mock_get_creds:
+            self.rally_base = rally.RallyBase()
+        self.assertTrue(mock_get_creds.called)
 
-    @mock.patch('functest.opnfv_tests.openstack.rally.rally.os_utils.'
-                'get_external_net', return_value=None)
-    def test_build_task_args_missing_floating_network(self, mock_func):
-        CONST.__setattr__('OS_AUTH_URL', None)
+    def test_build_task_args_missing_floating_network(self):
+        os.environ['OS_AUTH_URL'] = ''
+        self.rally_base.ext_net_name = ''
         task_args = self.rally_base._build_task_args('test_file_name')
         self.assertEqual(task_args['floating_network'], '')
-        mock_func.assert_called()
 
-    @mock.patch('functest.opnfv_tests.openstack.rally.rally.os_utils.'
-                'get_external_net', return_value='test_floating_network')
-    def test_build_task_args_missing_net_id(self, mock_func):
-        CONST.__setattr__('OS_AUTH_URL', None)
-        self.rally_base.network_dict['net_id'] = ''
+    def test_build_task_args_missing_net_id(self):
+        os.environ['OS_AUTH_URL'] = ''
+        self.rally_base.priv_net_id = ''
         task_args = self.rally_base._build_task_args('test_file_name')
         self.assertEqual(task_args['netid'], '')
-        mock_func.assert_called()
 
     @staticmethod
     def check_scenario_file(value):
@@ -73,7 +68,7 @@ class OSRallyTesting(unittest.TestCase):
     @mock.patch('functest.opnfv_tests.openstack.rally.rally.os.path.exists')
     @mock.patch('functest.opnfv_tests.openstack.rally.rally.os.makedirs')
     @mock.patch('functest.opnfv_tests.openstack.rally.rally.RallyBase.'
-                'apply_blacklist', return_value=mock.Mock())
+                '_apply_blacklist')
     def test_prepare_test_list_missing_temp_dir(
             self, mock_method, mock_os_makedirs, mock_path_exists):
         mock_path_exists.side_effect = self.check_temp_dir
@@ -109,19 +104,11 @@ class OSRallyTesting(unittest.TestCase):
         self.assertEqual(self.rally_base.task_succeed(json_raw),
                          True)
 
-    def polling(self):
-        if self.polling_iter == 0:
-            return "something"
-        self.polling_iter -= 1
-        return None
-
     def test_get_cmd_output(self):
         proc = mock.Mock()
-        attrs = {'poll.side_effect': self.polling,
-                 'stdout.readline.return_value': 'line'}
-        proc.configure_mock(**attrs)
+        proc.stdout.__iter__ = mock.Mock(return_value=iter(['line1', 'line2']))
         self.assertEqual(self.rally_base.get_cmd_output(proc),
-                         'lineline')
+                         'line1line2')
 
     @mock.patch('__builtin__.open', mock.mock_open())
     @mock.patch('functest.opnfv_tests.openstack.rally.rally.yaml.safe_load',
@@ -133,8 +120,8 @@ class OSRallyTesting(unittest.TestCase):
                      'installers': ['test_installer'],
                      'tests': ['other_test']}]})
     def test_excl_scenario_default(self, mock_func):
-        CONST.__setattr__('INSTALLER_TYPE', 'test_installer')
-        CONST.__setattr__('DEPLOY_SCENARIO', 'test_scenario')
+        os.environ['INSTALLER_TYPE'] = 'test_installer'
+        os.environ['DEPLOY_SCENARIO'] = 'test_scenario'
         self.assertEqual(self.rally_base.excl_scenario(), ['test'])
         mock_func.assert_called()
 
@@ -160,8 +147,8 @@ class OSRallyTesting(unittest.TestCase):
                      'installers': ['test_installer'],
                      'tests': ['test0b']}]})
     def test_excl_scenario_regex(self, mock_func):
-        CONST.__setattr__('INSTALLER_TYPE', 'test_installer')
-        CONST.__setattr__('DEPLOY_SCENARIO', 'os-ctrlT-featT-modeT')
+        os.environ['INSTALLER_TYPE'] = 'test_installer'
+        os.environ['DEPLOY_SCENARIO'] = 'os-ctrlT-featT-modeT'
         self.assertEqual(self.rally_base.excl_scenario(),
                          ['test1', 'test2', 'test3', 'test4'])
         mock_func.assert_called()
@@ -174,12 +161,12 @@ class OSRallyTesting(unittest.TestCase):
     @mock.patch('__builtin__.open', mock.mock_open())
     @mock.patch('functest.opnfv_tests.openstack.rally.rally.yaml.safe_load',
                 return_value={'functionality': [
-                    {'functions': ['no_live_migration'], 'tests': ['test']}]})
+                    {'functions': ['no_migration'], 'tests': ['test']}]})
     @mock.patch('functest.opnfv_tests.openstack.rally.rally.RallyBase.'
-                'live_migration_supported', return_value=False)
+                '_migration_supported', return_value=False)
     def test_excl_func_default(self, mock_func, mock_yaml_load):
-        CONST.__setattr__('INSTALLER_TYPE', 'test_installer')
-        CONST.__setattr__('DEPLOY_SCENARIO', 'test_scenario')
+        os.environ['INSTALLER_TYPE'] = 'test_installer'
+        os.environ['DEPLOY_SCENARIO'] = 'test_scenario'
         self.assertEqual(self.rally_base.excl_func(), ['test'])
         mock_func.assert_called()
         mock_yaml_load.assert_called()
@@ -189,8 +176,7 @@ class OSRallyTesting(unittest.TestCase):
         self.assertEqual(self.rally_base.excl_func(), [])
         mock_open.assert_called()
 
-    @mock.patch('functest.opnfv_tests.openstack.rally.rally.os.stat',
-                return_value=mock.Mock())
+    @mock.patch('functest.opnfv_tests.openstack.rally.rally.os.stat')
     def test_file_is_empty_default(self, mock_os_stat):
         attrs = {'st_size': 10}
         mock_os_stat.return_value.configure_mock(**attrs)
@@ -235,7 +221,7 @@ class OSRallyTesting(unittest.TestCase):
     @mock.patch('functest.opnfv_tests.openstack.rally.rally.RallyBase.'
                 '_build_task_args', return_value={})
     @mock.patch('functest.opnfv_tests.openstack.rally.rally.RallyBase.'
-                '_get_output', return_value=mock.Mock())
+                '_append_summary')
     @mock.patch('functest.opnfv_tests.openstack.rally.rally.RallyBase.'
                 'get_task_id', return_value=None)
     @mock.patch('functest.opnfv_tests.openstack.rally.rally.RallyBase.'
@@ -245,6 +231,7 @@ class OSRallyTesting(unittest.TestCase):
     @mock.patch('functest.opnfv_tests.openstack.rally.rally.subprocess.Popen')
     @mock.patch('functest.opnfv_tests.openstack.rally.rally.LOGGER.error')
     def test_run_task_taskid_missing(self, mock_logger_error, *args):
+        # pylint: disable=unused-argument
         self.rally_base._run_task('test_name')
         text = 'Failed to retrieve task_id, validating task...'
         mock_logger_error.assert_any_call(text)
@@ -257,7 +244,7 @@ class OSRallyTesting(unittest.TestCase):
     @mock.patch('functest.opnfv_tests.openstack.rally.rally.RallyBase.'
                 '_build_task_args', return_value={})
     @mock.patch('functest.opnfv_tests.openstack.rally.rally.RallyBase.'
-                '_get_output', return_value=mock.Mock())
+                '_append_summary')
     @mock.patch('functest.opnfv_tests.openstack.rally.rally.RallyBase.'
                 'get_task_id', return_value='1')
     @mock.patch('functest.opnfv_tests.openstack.rally.rally.RallyBase.'
@@ -268,14 +255,11 @@ class OSRallyTesting(unittest.TestCase):
                 return_value=True)
     @mock.patch('functest.opnfv_tests.openstack.rally.rally.subprocess.Popen')
     @mock.patch('functest.opnfv_tests.openstack.rally.rally.os.makedirs')
-    @mock.patch('functest.opnfv_tests.openstack.rally.rally.os.popen',
-                return_value=mock.Mock())
     @mock.patch('functest.opnfv_tests.openstack.rally.rally.LOGGER.info')
     @mock.patch('functest.opnfv_tests.openstack.rally.rally.LOGGER.error')
     def test_run_task_default(self, mock_logger_error, mock_logger_info,
-                              mock_popen, *args):
-        attrs = {'read.return_value': 'json_result'}
-        mock_popen.return_value.configure_mock(**attrs)
+                              *args):
+        # pylint: disable=unused-argument
         self.rally_base._run_task('test_name')
         text = 'Test scenario: "test_name" OK.\n'
         mock_logger_info.assert_any_call(text)
@@ -287,55 +271,97 @@ class OSRallyTesting(unittest.TestCase):
         with self.assertRaises(Exception):
             self.rally_base._prepare_env()
 
-    @mock.patch('functest.opnfv_tests.openstack.rally.rally.os_utils.'
-                'list_volume_types', return_value=None)
-    @mock.patch('functest.opnfv_tests.openstack.rally.rally.os_utils.'
-                'create_volume_type', return_value=None)
-    def test_prepare_env_volume_creation_failed(self, mock_list, mock_create):
-        self.rally_base.TESTS = ['test1', 'test2']
-        self.rally_base.test_name = 'test1'
-        with self.assertRaises(Exception):
-            self.rally_base._prepare_env()
-        mock_list.assert_called()
-        mock_create.assert_called()
-
-    @mock.patch('functest.opnfv_tests.openstack.rally.rally.os_utils.'
-                'list_volume_types', return_value=None)
-    @mock.patch('functest.opnfv_tests.openstack.rally.rally.os_utils.'
-                'create_volume_type', return_value=mock.Mock())
-    @mock.patch('functest.opnfv_tests.openstack.rally.rally.os_utils.'
-                'get_or_create_image', return_value=(True, None))
-    def test_prepare_env_image_missing(self, mock_get_img, mock_create_vt,
-                                       mock_list_vt):
+    @mock.patch('functest.opnfv_tests.openstack.snaps.snaps_utils.'
+                'get_active_compute_cnt')
+    @mock.patch('functest.opnfv_tests.openstack.snaps.snaps_utils.'
+                'get_ext_net_name', return_value='test_net_name')
+    @mock.patch('snaps.openstack.utils.deploy_utils.create_image',
+                return_value=None)
+    def test_prepare_env_image_missing(
+            self, mock_get_img, mock_get_net, mock_get_comp_cnt):
         self.rally_base.TESTS = ['test1', 'test2']
         self.rally_base.test_name = 'test1'
         with self.assertRaises(Exception):
             self.rally_base._prepare_env()
         mock_get_img.assert_called()
-        mock_create_vt.assert_called()
-        mock_list_vt.assert_called()
+        mock_get_net.assert_called()
+        mock_get_comp_cnt.assert_called()
 
-    @mock.patch('functest.opnfv_tests.openstack.rally.rally.os_utils.'
-                'list_volume_types', return_value=None)
-    @mock.patch('functest.opnfv_tests.openstack.rally.rally.os_utils.'
-                'create_volume_type', return_value=mock.Mock())
-    @mock.patch('functest.opnfv_tests.openstack.rally.rally.os_utils.'
-                'get_or_create_image', return_value=(True, 'image_id'))
-    @mock.patch('functest.opnfv_tests.openstack.rally.rally.os_utils.'
-                'create_shared_network_full', return_value=None)
-    def test_prepare_env_image_shared_network_creation_failed(
-            self, mock_create_net, mock_get_img, mock_create_vt, mock_list_vt):
+    @mock.patch('functest.opnfv_tests.openstack.snaps.snaps_utils.'
+                'get_active_compute_cnt')
+    @mock.patch('functest.opnfv_tests.openstack.snaps.snaps_utils.'
+                'get_ext_net_name', return_value='test_net_name')
+    @mock.patch('snaps.openstack.utils.deploy_utils.create_image')
+    @mock.patch('snaps.openstack.utils.deploy_utils.create_network',
+                return_value=None)
+    def test_prepare_env_network_creation_failed(
+            self, mock_create_net, mock_get_img, mock_get_net,
+            mock_get_comp_cnt):
         self.rally_base.TESTS = ['test1', 'test2']
         self.rally_base.test_name = 'test1'
         with self.assertRaises(Exception):
             self.rally_base._prepare_env()
         mock_create_net.assert_called()
         mock_get_img.assert_called()
-        mock_create_vt.assert_called()
-        mock_list_vt.assert_called()
+        mock_get_net.assert_called()
+        mock_get_comp_cnt.assert_called()
+
+    @mock.patch('functest.opnfv_tests.openstack.snaps.snaps_utils.'
+                'get_active_compute_cnt')
+    @mock.patch('functest.opnfv_tests.openstack.snaps.snaps_utils.'
+                'get_ext_net_name', return_value='test_net_name')
+    @mock.patch('snaps.openstack.utils.deploy_utils.create_image')
+    @mock.patch('snaps.openstack.utils.deploy_utils.create_network')
+    @mock.patch('snaps.openstack.utils.deploy_utils.create_router',
+                return_value=None)
+    def test_prepare_env_router_creation_failed(self, *args):
+        self.rally_base.TESTS = ['test1', 'test2']
+        self.rally_base.test_name = 'test1'
+        with self.assertRaises(Exception):
+            self.rally_base._prepare_env()
+        for func in args:
+            func.assert_called()
+
+    @mock.patch('functest.opnfv_tests.openstack.snaps.snaps_utils.'
+                'get_active_compute_cnt')
+    @mock.patch('functest.opnfv_tests.openstack.snaps.snaps_utils.'
+                'get_ext_net_name', return_value='test_net_name')
+    @mock.patch('snaps.openstack.utils.deploy_utils.create_image')
+    @mock.patch('snaps.openstack.utils.deploy_utils.create_network')
+    @mock.patch('snaps.openstack.utils.deploy_utils.create_router')
+    @mock.patch('snaps.openstack.create_flavor.OpenStackFlavor.create',
+                return_value=None)
+    def test_prepare_env_flavor_creation_failed(self, mock_create_flavor,
+                                                *args):
+        self.rally_base.TESTS = ['test1', 'test2']
+        self.rally_base.test_name = 'test1'
+        with self.assertRaises(Exception):
+            self.rally_base._prepare_env()
+        for func in args:
+            func.assert_called()
+        mock_create_flavor.assert_called_once()
+
+    @mock.patch('functest.opnfv_tests.openstack.snaps.snaps_utils.'
+                'get_active_compute_cnt')
+    @mock.patch('functest.opnfv_tests.openstack.snaps.snaps_utils.'
+                'get_ext_net_name', return_value='test_net_name')
+    @mock.patch('snaps.openstack.utils.deploy_utils.create_image')
+    @mock.patch('snaps.openstack.utils.deploy_utils.create_network')
+    @mock.patch('snaps.openstack.utils.deploy_utils.create_router')
+    @mock.patch('snaps.openstack.create_flavor.OpenStackFlavor.create',
+                side_effect=[mock.Mock, None])
+    def test_prepare_env_flavor_alt_creation_failed(self, mock_create_flavor,
+                                                    *args):
+        self.rally_base.TESTS = ['test1', 'test2']
+        self.rally_base.test_name = 'test1'
+        with self.assertRaises(Exception):
+            self.rally_base._prepare_env()
+        for func in args:
+            func.assert_called()
+        self.assertEqual(mock_create_flavor.call_count, 2)
 
     @mock.patch('functest.opnfv_tests.openstack.rally.rally.RallyBase.'
-                '_run_task', return_value=mock.Mock())
+                '_run_task')
     def test_run_tests_all(self, mock_run_task):
         self.rally_base.TESTS = ['test1', 'test2']
         self.rally_base.test_name = 'all'
@@ -344,29 +370,23 @@ class OSRallyTesting(unittest.TestCase):
         mock_run_task.assert_any_call('test2')
 
     @mock.patch('functest.opnfv_tests.openstack.rally.rally.RallyBase.'
-                '_run_task', return_value=mock.Mock())
+                '_run_task')
     def test_run_tests_default(self, mock_run_task):
         self.rally_base.TESTS = ['test1', 'test2']
         self.rally_base.test_name = 'test1'
         self.rally_base._run_tests()
         mock_run_task.assert_any_call('test1')
 
-    @mock.patch('functest.opnfv_tests.openstack.rally.rally.os_utils.'
-                'delete_volume_type')
-    @mock.patch('functest.opnfv_tests.openstack.rally.rally.os_utils.'
-                'delete_glance_image')
-    def test_clean_up_default(self, mock_glance_method, mock_vol_method):
-        self.rally_base.volume_type = mock.Mock()
-        self.rally_base.cinder_client = mock.Mock()
-        self.rally_base.image_exists = False
-        self.rally_base.image_id = 1
-        self.rally_base.nova_client = mock.Mock()
+    def test_clean_up_default(self):
+        creator1 = mock.Mock()
+        creator2 = mock.Mock()
+        self.rally_base.creators = [creator1, creator2]
         self.rally_base._clean_up()
-        mock_vol_method.assert_any_call(self.rally_base.cinder_client,
-                                        self.rally_base.volume_type)
-        mock_glance_method.assert_any_call(self.rally_base.nova_client,
-                                           1)
+        self.assertTrue(creator1.clean.called)
+        self.assertTrue(creator2.clean.called)
 
+    @mock.patch('functest.opnfv_tests.openstack.tempest.conf_utils.'
+                'create_rally_deployment')
     @mock.patch('functest.opnfv_tests.openstack.rally.rally.RallyBase.'
                 '_prepare_env')
     @mock.patch('functest.opnfv_tests.openstack.rally.rally.RallyBase.'
@@ -377,13 +397,33 @@ class OSRallyTesting(unittest.TestCase):
                 '_clean_up')
     def test_run_default(self, *args):
         self.assertEqual(self.rally_base.run(), testcase.TestCase.EX_OK)
-        map(lambda m: m.assert_called(), args)
+        for func in args:
+            func.assert_called()
 
+    @mock.patch('functest.opnfv_tests.openstack.tempest.conf_utils.'
+                'create_rally_deployment', side_effect=Exception)
+    def test_run_exception_create_rally_dep(self, mock_create_rally_dep):
+        self.assertEqual(self.rally_base.run(), testcase.TestCase.EX_RUN_ERROR)
+        mock_create_rally_dep.assert_called()
+
+    @mock.patch('functest.opnfv_tests.openstack.tempest.conf_utils.'
+                'create_rally_deployment', return_value=mock.Mock())
     @mock.patch('functest.opnfv_tests.openstack.rally.rally.RallyBase.'
                 '_prepare_env', side_effect=Exception)
-    def test_run_exception(self, mock_prep_env):
+    def test_run_exception_prepare_env(self, mock_prep_env, *args):
+        # pylint: disable=unused-argument
         self.assertEqual(self.rally_base.run(), testcase.TestCase.EX_RUN_ERROR)
         mock_prep_env.assert_called()
+
+    def test_append_summary(self):
+        text = '[{"result":[{"error":[]},{"error":["err"]}],' \
+               '"full_duration": 17.312026}]'
+        self.rally_base._append_summary(text, "foo_test")
+        self.assertEqual(self.rally_base.summary[0]['test_name'], "foo_test")
+        self.assertEqual(self.rally_base.summary[0]['overall_duration'],
+                         17.312026)
+        self.assertEqual(self.rally_base.summary[0]['nb_tests'], 2)
+        self.assertEqual(self.rally_base.summary[0]['nb_success'], 1)
 
 
 if __name__ == "__main__":

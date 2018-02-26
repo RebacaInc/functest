@@ -5,89 +5,45 @@
 # are made available under the terms of the Apache License, Version 2.0
 # which accompanies this distribution, and is available at
 # http://www.apache.org/licenses/LICENSE-2.0
-#
 
-import os
+# pylint: disable=missing-docstring
 
 import click
 import prettytable
+import six
 
-from functest.utils.constants import CONST
-import functest.utils.functest_utils as ft_utils
+from functest.utils import env
 
 
-class Env(object):
+class Env(object):  # pylint: disable=too-few-public-methods
 
-    def __init__(self):
-        pass
-
-    def prepare(self):
-        if self.status(verbose=False) == 0:
-            answer = raw_input("It seems that the environment has been "
-                               "already prepared. Do you want to do "
-                               "it again? [y|n]\n")
-            while True:
-                if answer.lower() in ["y", "yes"]:
-                    os.remove(CONST.__getattribute__('env_active'))
-                    break
-                elif answer.lower() in ["n", "no"]:
-                    return
-                else:
-                    answer = raw_input("Invalid answer. Please type [y|n]\n")
-
-        ft_utils.execute_command("prepare_env start")
-
-    def show(self):
-        def _get_value(attr, default='Unknown'):
-            return attr if attr else default
-
-        install_type = _get_value(CONST.__getattribute__('INSTALLER_TYPE'))
-        installer_ip = _get_value(CONST.__getattribute__('INSTALLER_IP'))
-        installer_info = ("%s, %s" % (install_type, installer_ip))
-        scenario = _get_value(CONST.__getattribute__('DEPLOY_SCENARIO'))
-        node = _get_value(CONST.__getattribute__('NODE_NAME'))
-        is_debug = _get_value(CONST.__getattribute__('CI_DEBUG'), 'false')
-        build_tag = CONST.__getattribute__('BUILD_TAG')
-        if build_tag is not None:
+    @staticmethod
+    def show():
+        install_type = env.get('INSTALLER_TYPE')
+        scenario = env.get('DEPLOY_SCENARIO')
+        node = env.get('NODE_NAME')
+        build_tag = env.get('BUILD_TAG')
+        if build_tag:
             build_tag = build_tag.lstrip(
                 "jenkins-").lstrip("functest").lstrip("-")
 
-        STATUS = "not ready"
-        if self.status(verbose=False) == 0:
-            STATUS = "ready"
-
-        env_info = {'INSTALLER': installer_info,
+        env_info = {'INSTALLER': install_type,
                     'SCENARIO': scenario,
                     'POD': node,
-                    'DEBUG FLAG': is_debug,
-                    'BUILD_TAG': build_tag,
-                    'STATUS': STATUS}
+                    'BUILD_TAG': build_tag}
 
         return env_info
 
-    def status(self, verbose=True):
-        ret_val = 0
-        if not os.path.isfile(CONST.__getattribute__('env_active')):
-            if verbose:
-                click.echo("Functest environment is not installed.\n")
-            ret_val = 1
-        elif verbose:
-            click.echo("Functest environment ready to run tests.\n")
 
-        return ret_val
+class CliEnv(object):  # pylint: disable=too-few-public-methods
 
-
-class CliEnv(Env):
-
-    def __init__(self):
-        super(CliEnv, self).__init__()
-
-    def show(self):
-        env_info = super(CliEnv, self).show()
+    @staticmethod
+    def show():
+        env_info = Env.show()
         msg = prettytable.PrettyTable(
             header_style='upper', padding_width=5,
             field_names=['Functest Environment', 'value'])
-        for key, value in env_info.iteritems():
+        for key, value in six.iteritems(env_info):
             if key is not None:
                 msg.add_row([key, value])
         click.echo(msg.get_string())

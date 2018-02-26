@@ -7,6 +7,8 @@
 # which accompanies this distribution, and is available at
 # http://www.apache.org/licenses/LICENSE-2.0
 
+# pylint: disable=missing-docstring
+
 """vm controll module"""
 
 import logging
@@ -32,11 +34,7 @@ class VmController(object):
         credentials = util_info["credentials"]
 
         self.util = Utilvnf()
-        self.util.set_credentials(credentials["username"],
-                                  credentials["password"],
-                                  credentials["auth_url"],
-                                  credentials["tenant_name"],
-                                  credentials["region_name"])
+        self.util.set_credentials(credentials["snaps_creds"])
 
         with open(self.util.test_env_config_yaml) as file_fd:
             test_env_config_yaml = yaml.safe_load(file_fd)

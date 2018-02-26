@@ -7,17 +7,20 @@
 # which accompanies this distribution, and is available at
 # http://www.apache.org/licenses/LICENSE-2.0
 
+# pylint: disable=missing-docstring
+
 """vrouter testing base class module"""
 
 import datetime
 import json
 import logging
 import os
-import pkg_resources
 import time
 
+import pkg_resources
+
 import functest.core.vnf as vnf
-from functest.utils.constants import CONST
+from functest.utils import config
 from functest.opnfv_tests.vnf.router.test_controller import function_test_exec
 from functest.opnfv_tests.vnf.router.utilvnf import Utilvnf
 
@@ -34,8 +37,8 @@ class VrouterOnBoardingBase(vnf.VnfOnBoarding):
         super(VrouterOnBoardingBase, self).__init__(**kwargs)
         self.case_dir = pkg_resources.resource_filename(
             'functest', 'opnfv_tests/vnf/router')
-        self.data_dir = CONST.__getattribute__('dir_router_data')
-        self.result_dir = os.path.join(CONST.__getattribute__('dir_results'),
+        self.data_dir = getattr(config.CONF, 'dir_router_data')
+        self.result_dir = os.path.join(getattr(config.CONF, 'dir_results'),
                                        self.case_name)
         self.util = Utilvnf()
         self.util_info = {}
@@ -66,8 +69,7 @@ class VrouterOnBoardingBase(vnf.VnfOnBoarding):
                                          test_info["test_kind"] +
                                          " test.")
                         (result, result_data) = self.function_test_vrouter(
-                                                    target_vnf_name,
-                                                    test_info)
+                            target_vnf_name, test_info)
                         test_result_data_list.append(result_data)
                         if not result:
                             break
@@ -115,5 +117,6 @@ class VrouterOnBoardingBase(vnf.VnfOnBoarding):
         return result, test_result_data
 
     def get_vnf_info_list(self, target_vnf_name):
+        # pylint: disable=unused-argument,no-self-use
         vnf_info_list = []
         return vnf_info_list

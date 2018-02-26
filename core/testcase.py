@@ -9,14 +9,19 @@
 
 """Define the parent class of all Functest TestCases."""
 
+from datetime import datetime
+import json
 import logging
 import os
+import re
+import requests
+
+from functest.utils import decorators
+from functest.utils import env
+
 
 import prettytable
 
-import functest.utils.functest_utils as ft_utils
-import functest.utils.openstack_clean as os_clean
-import functest.utils.openstack_snapshot as os_snapshot
 
 __author__ = "Cedric Ollivier <cedric.ollivier@orange.com>"
 
@@ -36,6 +41,8 @@ class TestCase(object):
     EX_TESTCASE_FAILED = os.EX_SOFTWARE - 2
     """results are false"""
 
+    _job_name_rule = "(dai|week)ly-(.+?)-[0-9]*"
+    _headers = {'Content-Type': 'application/json'}
     __logger = logging.getLogger(__name__)
 
     def __init__(self, **kwargs):
@@ -140,20 +147,30 @@ class TestCase(object):
         self.__logger.error("Run must be implemented")
         return TestCase.EX_RUN_ERROR
 
+    @decorators.can_dump_request_to_file
     def push_to_db(self):
         """Push the results of the test case to the DB.
 
-        It allows publishing the results and to check the status.
+        It allows publishing the results and checking the status.
 
         It could be overriden if the common implementation is not
-        suitable. The following attributes must be set before pushing
-        the results to DB:
+        suitable.
+
+        The following attributes must be set before pushing the results to DB:
 
             * project_name,
             * case_name,
             * result,
             * start_time,
             * stop_time.
+
+        The next vars must be set in env:
+
+            * TEST_DB_URL,
+            * INSTALLER_TYPE,
+            * DEPLOY_SCENARIO,
+            * NODE_NAME,
+            * BUILD_TAG.
 
         Returns:
             TestCase.EX_OK if results were pushed to DB.
@@ -164,30 +181,42 @@ class TestCase(object):
             assert self.case_name
             assert self.start_time
             assert self.stop_time
-            pub_result = 'PASS' if self.is_successful(
+            url = env.get('TEST_DB_URL')
+            data = {"project_name": self.project_name,
+                    "case_name": self.case_name,
+                    "details": self.details}
+            data["installer"] = env.get('INSTALLER_TYPE')
+            data["scenario"] = env.get('DEPLOY_SCENARIO')
+            data["pod_name"] = env.get('NODE_NAME')
+            data["build_tag"] = env.get('BUILD_TAG')
+            data["criteria"] = 'PASS' if self.is_successful(
                 ) == TestCase.EX_OK else 'FAIL'
-            if ft_utils.push_results_to_db(
-                    self.project_name, self.case_name, self.start_time,
-                    self.stop_time, pub_result, self.details):
-                self.__logger.info(
-                    "The results were successfully pushed to DB")
-                return TestCase.EX_OK
-            else:
-                self.__logger.error("The results cannot be pushed to DB")
-                return TestCase.EX_PUSH_TO_DB_ERROR
+            data["start_date"] = datetime.fromtimestamp(
+                self.start_time).strftime('%Y-%m-%d %H:%M:%S')
+            data["stop_date"] = datetime.fromtimestamp(
+                self.stop_time).strftime('%Y-%m-%d %H:%M:%S')
+            try:
+                data["version"] = re.search(
+                    TestCase._job_name_rule,
+                    env.get('BUILD_TAG')).group(2)
+            except Exception:  # pylint: disable=broad-except
+                data["version"] = "unknown"
+            req = requests.post(
+                url, data=json.dumps(data, sort_keys=True),
+                headers=self._headers)
+            req.raise_for_status()
+            self.__logger.info(
+                "The results were successfully pushed to DB %s", url)
+        except AssertionError:
+            self.__logger.exception(
+                "Please run test before publishing the results")
+            return TestCase.EX_PUSH_TO_DB_ERROR
+        except requests.exceptions.HTTPError:
+            self.__logger.exception("The HTTP request raises issues")
+            return TestCase.EX_PUSH_TO_DB_ERROR
         except Exception:  # pylint: disable=broad-except
             self.__logger.exception("The results cannot be pushed to DB")
             return TestCase.EX_PUSH_TO_DB_ERROR
-
-    def create_snapshot(self):  # pylint: disable=no-self-use
-        """Save the testing environment before running test.
-
-        It can be overriden if resources must be listed running the
-        test case.
-
-        Returns:
-            TestCase.EX_OK
-        """
         return TestCase.EX_OK
 
     def clean(self):
@@ -196,33 +225,3 @@ class TestCase(object):
         It can be overriden if resources must be deleted after
         running the test case.
         """
-
-
-class OSGCTestCase(TestCase):
-    """Model for single test case which requires an OpenStack Garbage
-    Collector."""
-
-    __logger = logging.getLogger(__name__)
-
-    def create_snapshot(self):
-        """Create a snapshot listing the OpenStack resources.
-
-        Returns:
-            TestCase.EX_OK if os_snapshot.main() returns 0.
-            TestCase.EX_RUN_ERROR otherwise.
-        """
-        try:
-            assert os_snapshot.main() == 0
-            self.__logger.info("OpenStack resources snapshot created")
-            return TestCase.EX_OK
-        except Exception:  # pylint: disable=broad-except
-            self.__logger.exception("Cannot create the snapshot")
-            return TestCase.EX_RUN_ERROR
-
-    def clean(self):
-        """Clean the OpenStack resources."""
-        try:
-            assert os_clean.main() == 0
-            self.__logger.info("OpenStack resources cleaned")
-        except Exception:  # pylint: disable=broad-except
-            self.__logger.exception("Cannot clean the OpenStack resources")

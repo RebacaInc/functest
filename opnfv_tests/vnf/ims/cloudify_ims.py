@@ -21,24 +21,25 @@ import yaml
 from functest.energy import energy
 from functest.opnfv_tests.openstack.snaps import snaps_utils
 import functest.opnfv_tests.vnf.ims.clearwater_ims_base as clearwater_ims_base
-from functest.utils.constants import CONST
-import functest.utils.openstack_utils as os_utils
+from functest.utils import config
 
-from snaps.openstack.os_credentials import OSCreds
-from snaps.openstack.create_network import (NetworkSettings, SubnetSettings,
-                                            OpenStackNetwork)
-from snaps.openstack.create_security_group import (SecurityGroupSettings,
-                                                   SecurityGroupRuleSettings,
-                                                   Direction, Protocol,
-                                                   OpenStackSecurityGroup)
-from snaps.openstack.create_router import RouterSettings, OpenStackRouter
-from snaps.openstack.create_instance import (VmInstanceSettings,
-                                             FloatingIpSettings,
-                                             OpenStackVmInstance)
-from snaps.openstack.create_flavor import FlavorSettings, OpenStackFlavor
-from snaps.openstack.create_image import ImageSettings, OpenStackImage
-from snaps.openstack.create_keypairs import KeypairSettings, OpenStackKeypair
-from snaps.openstack.create_network import PortSettings
+from snaps.config.flavor import FlavorConfig
+from snaps.config.image import ImageConfig
+from snaps.config.keypair import KeypairConfig
+from snaps.config.network import NetworkConfig, PortConfig, SubnetConfig
+from snaps.config.router import RouterConfig
+from snaps.config.security_group import (
+    Direction, Protocol, SecurityGroupConfig, SecurityGroupRuleConfig)
+from snaps.config.vm_inst import FloatingIpConfig, VmInstanceConfig
+
+from snaps.openstack.create_flavor import OpenStackFlavor
+from snaps.openstack.create_image import OpenStackImage
+from snaps.openstack.create_instance import OpenStackVmInstance
+from snaps.openstack.create_keypairs import OpenStackKeypair
+from snaps.openstack.create_network import OpenStackNetwork
+from snaps.openstack.create_router import OpenStackRouter
+from snaps.openstack.create_security_group import OpenStackSecurityGroup
+from snaps.openstack.utils import keystone_utils
 
 
 __author__ = "Valentin Boucher <valentin.boucher@orange.com>"
@@ -57,13 +58,10 @@ class CloudifyIms(clearwater_ims_base.ClearwaterOnBoardingBase):
 
         # Retrieve the configuration
         try:
-            self.config = CONST.__getattribute__(
-                'vnf_{}_config'.format(self.case_name))
+            self.config = getattr(
+                config.CONF, 'vnf_{}_config'.format(self.case_name))
         except Exception:
             raise Exception("VNF config file not found")
-
-        self.snaps_creds = ''
-        self.created_object = []
 
         config_file = os.path.join(self.case_dir, self.config)
         self.orchestrator = dict(
@@ -101,12 +99,19 @@ class CloudifyIms(clearwater_ims_base.ClearwaterOnBoardingBase):
 
         self.__logger.info("Additional pre-configuration steps")
 
-        self.snaps_creds = OSCreds(
-            username=self.creds['username'],
-            password=self.creds['password'],
-            auth_url=self.creds['auth_url'],
-            project_name=self.creds['tenant'],
-            identity_api_version=int(os_utils.get_keystone_client_version()))
+        compute_quotas = self.os_project.get_compute_quotas()
+        network_quotas = self.os_project.get_network_quotas()
+
+        for key, value in (
+                self.vnf['requirements']['compute_quotas'].items()):
+            setattr(compute_quotas, key, value)
+
+        for key, value in (
+                self.vnf['requirements']['network_quotas'].items()):
+            setattr(network_quotas, key, value)
+
+        compute_quotas = self.os_project.update_compute_quotas(compute_quotas)
+        network_quotas = self.os_project.update_network_quotas(network_quotas)
 
         # needs some images
         self.__logger.info("Upload some OS images if it doesn't exist")
@@ -115,12 +120,11 @@ class CloudifyIms(clearwater_ims_base.ClearwaterOnBoardingBase):
             if image_file and image_name:
                 image_creator = OpenStackImage(
                     self.snaps_creds,
-                    ImageSettings(name=image_name,
-                                  image_user='cloud',
-                                  img_format='qcow2',
-                                  image_file=image_file))
+                    ImageConfig(
+                        name=image_name, image_user='cloud',
+                        img_format='qcow2', image_file=image_file))
                 image_creator.create()
-                # self.created_object.append(image_creator)
+                self.created_object.append(image_creator)
 
     def deploy_orchestrator(self):
         """
@@ -133,25 +137,28 @@ class CloudifyIms(clearwater_ims_base.ClearwaterOnBoardingBase):
         start_time = time.time()
         self.__logger.info("Creating keypair ...")
         kp_file = os.path.join(self.data_dir, "cloudify_ims.pem")
-        keypair_settings = KeypairSettings(name='cloudify_ims_kp',
-                                           private_filepath=kp_file)
+        keypair_settings = KeypairConfig(
+            name='cloudify_ims_kp-{}'.format(self.uuid),
+            private_filepath=kp_file)
         keypair_creator = OpenStackKeypair(self.snaps_creds, keypair_settings)
         keypair_creator.create()
         self.created_object.append(keypair_creator)
 
         self.__logger.info("Creating full network ...")
-        subnet_settings = SubnetSettings(name='cloudify_ims_subnet',
-                                         cidr='10.67.79.0/24')
-        network_settings = NetworkSettings(name='cloudify_ims_network',
-                                           subnet_settings=[subnet_settings])
+        subnet_settings = SubnetConfig(
+            name='cloudify_ims_subnet-{}'.format(self.uuid),
+            cidr='10.67.79.0/24')
+        network_settings = NetworkConfig(
+            name='cloudify_ims_network-{}'.format(self.uuid),
+            subnet_settings=[subnet_settings])
         network_creator = OpenStackNetwork(self.snaps_creds, network_settings)
         network_creator.create()
         self.created_object.append(network_creator)
         ext_net_name = snaps_utils.get_ext_net_name(self.snaps_creds)
         router_creator = OpenStackRouter(
             self.snaps_creds,
-            RouterSettings(
-                name='cloudify_ims_router',
+            RouterConfig(
+                name='cloudify_ims_router-{}'.format(self.uuid),
                 external_gateway=ext_net_name,
                 internal_subnets=[subnet_settings.name]))
         router_creator.create()
@@ -161,29 +168,29 @@ class CloudifyIms(clearwater_ims_base.ClearwaterOnBoardingBase):
         self.__logger.info("Creating security group for cloudify manager vm")
         sg_rules = list()
         sg_rules.append(
-            SecurityGroupRuleSettings(sec_grp_name="sg-cloudify-manager",
-                                      direction=Direction.ingress,
-                                      protocol=Protocol.tcp, port_range_min=1,
-                                      port_range_max=65535))
+            SecurityGroupRuleConfig(
+                sec_grp_name="sg-cloudify-manager-{}".format(self.uuid),
+                direction=Direction.ingress, protocol=Protocol.tcp,
+                port_range_min=1, port_range_max=65535))
         sg_rules.append(
-            SecurityGroupRuleSettings(sec_grp_name="sg-cloudify-manager",
-                                      direction=Direction.ingress,
-                                      protocol=Protocol.udp, port_range_min=1,
-                                      port_range_max=65535))
+            SecurityGroupRuleConfig(
+                sec_grp_name="sg-cloudify-manager-{}".format(self.uuid),
+                direction=Direction.ingress, protocol=Protocol.udp,
+                port_range_min=1, port_range_max=65535))
 
-        securit_group_creator = OpenStackSecurityGroup(
+        security_group_creator = OpenStackSecurityGroup(
             self.snaps_creds,
-            SecurityGroupSettings(
-                name="sg-cloudify-manager",
+            SecurityGroupConfig(
+                name="sg-cloudify-manager-{}".format(self.uuid),
                 rule_settings=sg_rules))
 
-        securit_group_creator.create()
-        self.created_object.append(securit_group_creator)
+        security_group_creator.create()
+        self.created_object.append(security_group_creator)
 
         # orchestrator VM flavor
         self.__logger.info("Get or create flavor for cloudify manager vm ...")
 
-        flavor_settings = FlavorSettings(
+        flavor_settings = FlavorConfig(
             name=self.orchestrator['requirements']['flavor']['name'],
             ram=self.orchestrator['requirements']['flavor']['ram_min'],
             disk=50,
@@ -191,45 +198,48 @@ class CloudifyIms(clearwater_ims_base.ClearwaterOnBoardingBase):
         flavor_creator = OpenStackFlavor(self.snaps_creds, flavor_settings)
         flavor_creator.create()
         self.created_object.append(flavor_creator)
-        image_settings = ImageSettings(
+        image_settings = ImageConfig(
             name=self.orchestrator['requirements']['os_image'],
             image_user='centos',
             exists=True)
 
-        port_settings = PortSettings(name='cloudify_manager_port',
-                                     network_name=network_settings.name)
+        port_settings = PortConfig(
+            name='cloudify_manager_port-{}'.format(self.uuid),
+            network_name=network_settings.name)
 
-        manager_settings = VmInstanceSettings(
-            name='cloudify_manager',
+        manager_settings = VmInstanceConfig(
+            name='cloudify_manager-{}'.format(self.uuid),
             flavor=flavor_settings.name,
             port_settings=[port_settings],
-            security_group_names=[securit_group_creator.sec_grp_settings.name],
-            floating_ip_settings=[FloatingIpSettings(
-                name='cloudify_manager_fip',
+            security_group_names=[
+                security_group_creator.sec_grp_settings.name],
+            floating_ip_settings=[FloatingIpConfig(
+                name='cloudify_manager_fip-{}'.format(self.uuid),
                 port_name=port_settings.name,
                 router_name=router_creator.router_settings.name)])
 
-        manager_creator = OpenStackVmInstance(self.snaps_creds,
-                                              manager_settings,
-                                              image_settings,
-                                              keypair_settings)
+        manager_creator = OpenStackVmInstance(
+            self.snaps_creds, manager_settings, image_settings,
+            keypair_settings)
 
         self.__logger.info("Creating cloudify manager VM")
         manager_creator.create()
         self.created_object.append(manager_creator)
 
-        public_auth_url = os_utils.get_endpoint('identity')
+        public_auth_url = keystone_utils.get_endpoint(
+            self.snaps_creds, 'identity')
 
-        self.__logger.info("Set creds for cloudify manager")
-        cfy_creds = dict(keystone_username=self.tenant_name,
-                         keystone_password=self.tenant_name,
-                         keystone_tenant_name=self.tenant_name,
-                         keystone_url=public_auth_url)
+        cfy_creds = dict(
+            keystone_username=self.snaps_creds.username,
+            keystone_password=self.snaps_creds.password,
+            keystone_tenant_name=self.snaps_creds.project_name,
+            keystone_url=public_auth_url,
+            region=self.snaps_creds.region_name)
+        self.__logger.info("Set creds for cloudify manager %s", cfy_creds)
 
-        cfy_client = CloudifyClient(host=manager_creator.get_floating_ip().ip,
-                                    username='admin',
-                                    password='admin',
-                                    tenant='default_tenant')
+        cfy_client = CloudifyClient(
+            host=manager_creator.get_floating_ip().ip,
+            username='admin', password='admin', tenant='default_tenant')
 
         self.orchestrator['object'] = cfy_client
 
@@ -242,8 +252,8 @@ class CloudifyIms(clearwater_ims_base.ClearwaterOnBoardingBase):
                 self.__logger.debug("The current manager status is %s",
                                     cfy_status)
             except Exception:  # pylint: disable=broad-except
-                self.__logger.warning("Cloudify Manager isn't " +
-                                      "up and running. Retrying ...")
+                self.__logger.exception(
+                    "Cloudify Manager isn't up and running. Retrying ...")
             retry = retry - 1
             time.sleep(30)
 
@@ -268,18 +278,19 @@ class CloudifyIms(clearwater_ims_base.ClearwaterOnBoardingBase):
             scp = SCPClient(ssh.get_transport(), socket_timeout=15.0)
             scp.put(kp_file, '~/')
             cmd = "sudo cp ~/cloudify_ims.pem /etc/cloudify/"
-            run_blocking_ssh_command(ssh, cmd)
+            self.run_blocking_ssh_command(ssh, cmd)
             cmd = "sudo chmod 444 /etc/cloudify/cloudify_ims.pem"
-            run_blocking_ssh_command(ssh, cmd)
+            self.run_blocking_ssh_command(ssh, cmd)
             cmd = "sudo yum install -y gcc python-devel"
-            run_blocking_ssh_command(ssh, cmd, "Unable to install packages \
-                                                on manager")
+            self.run_blocking_ssh_command(
+                ssh, cmd, "Unable to install packages on manager")
 
         self.details['orchestrator'].update(status='PASS', duration=duration)
 
         self.vnf['inputs'].update(dict(
             external_network_name=ext_net_name,
-            network_name=network_settings.name
+            network_name=network_settings.name,
+            key_pair_name=keypair_settings.name
         ))
         self.result = 1/3 * 100
         return True
@@ -296,7 +307,7 @@ class CloudifyIms(clearwater_ims_base.ClearwaterOnBoardingBase):
                                               descriptor.get('file_name'))
 
         self.__logger.info("Get or create flavor for all clearwater vm")
-        flavor_settings = FlavorSettings(
+        flavor_settings = FlavorConfig(
             name=self.vnf['requirements']['flavor']['name'],
             ram=self.vnf['requirements']['flavor']['ram_min'],
             disk=25,
@@ -318,7 +329,7 @@ class CloudifyIms(clearwater_ims_base.ClearwaterOnBoardingBase):
                            _get_deployment_environment_creation_execution(
                                cfy_client, descriptor.get('name')),
                            self.__logger,
-                           timeout=600)
+                           timeout=300)
 
         self.__logger.info("Start the VNF Instance deployment")
         execution = cfy_client.executions.start(descriptor.get('name'),
@@ -386,7 +397,7 @@ class CloudifyIms(clearwater_ims_base.ClearwaterOnBoardingBase):
                     try:
                         cfy_client.executions.cancel(execution['id'],
                                                      force=True)
-                    except:  # pylint: disable=broad-except
+                    except Exception:  # pylint: disable=broad-except
                         self.__logger.warn("Can't cancel the current exec")
 
             execution = cfy_client.executions.start(
@@ -398,22 +409,26 @@ class CloudifyIms(clearwater_ims_base.ClearwaterOnBoardingBase):
             wait_for_execution(cfy_client, execution, self.__logger)
             cfy_client.deployments.delete(self.vnf['descriptor'].get('name'))
             cfy_client.blueprints.delete(self.vnf['descriptor'].get('name'))
-        except:  # pylint: disable=broad-except
+        except Exception:  # pylint: disable=broad-except
             self.__logger.warn("Some issue during the undeployment ..")
             self.__logger.warn("Tenant clean continue ..")
 
-        self.__logger.info('Remove the cloudify manager OS object ..')
-        for creator in reversed(self.created_object):
-            try:
-                creator.clean()
-            except Exception as exc:
-                self.logger.error('Unexpected error cleaning - %s', exc)
         super(CloudifyIms, self).clean()
+
+    @staticmethod
+    def run_blocking_ssh_command(ssh, cmd,
+                                 error_msg="Unable to run this command"):
+        """Command to run ssh command with the exit status."""
+        _, stdout, stderr = ssh.exec_command(cmd)
+        CloudifyIms.__logger.debug("SSH %s stdout: %s", cmd, stdout.read())
+        if stdout.channel.recv_exit_status() != 0:
+            CloudifyIms.__logger.error("SSH %s stderr: %s", cmd, stderr.read())
+            raise Exception(error_msg)
 
     @energy.enable_recording
     def run(self, **kwargs):
         """Execute CloudifyIms test case."""
-        super(CloudifyIms, self).run(**kwargs)
+        return super(CloudifyIms, self).run(**kwargs)
 
 
 # ----------------------------------------------------------
@@ -441,7 +456,7 @@ def get_config(parameter, file_path):
     return value
 
 
-def wait_for_execution(client, execution, logger, timeout=2400, ):
+def wait_for_execution(client, execution, logger, timeout=1500, ):
     """Wait for a workflow execution on Cloudify Manager."""
     # if execution already ended - return without waiting
     if execution.status in Execution.END_STATES:
@@ -523,10 +538,3 @@ def sig_test_format(sig_test):
     short_sig_test_result['skipped'] = nb_skipped
     nb_test = nb_passed + nb_skipped
     return (short_sig_test_result, nb_test)
-
-
-def run_blocking_ssh_command(ssh, cmd, error_msg="Unable to run this command"):
-    """Command to run ssh command with the exit status."""
-    stdin, stdout, stderr = ssh.exec_command(cmd)
-    if stdout.channel.recv_exit_status() != 0:
-        raise Exception(error_msg)

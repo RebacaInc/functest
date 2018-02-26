@@ -7,6 +7,8 @@
 # which accompanies this distribution, and is available at
 # http://www.apache.org/licenses/LICENSE-2.0
 
+# pylint: disable=missing-docstring
+
 """ Utility module of vrouter testcase """
 
 import json
@@ -16,12 +18,11 @@ import pkg_resources
 import requests
 import yaml
 
-from functest.utils.constants import CONST
+from functest.utils import config
 from git import Repo
-from novaclient import client as novaclient
-from keystoneauth1 import session
-from keystoneauth1 import loading
 from requests.auth import HTTPBasicAuth
+from snaps.openstack.utils import nova_utils
+
 
 RESULT_SPRIT_INDEX = {
     "transfer": 8,
@@ -47,21 +48,14 @@ NUMBER_OF_DIGITS_FOR_AVG_JITTER = 3
 NUMBER_OF_DIGITS_FOR_AVG_PKT_LOSS = 1
 
 
-class Utilvnf(object):
+class Utilvnf(object):  # pylint: disable=too-many-instance-attributes
     """ Utility class of vrouter testcase """
 
     logger = logging.getLogger(__name__)
 
     def __init__(self):
-        self.username = ""
-        self.password = ""
-        self.auth_url = ""
-        self.tenant_name = ""
-        self.region_name = ""
-
-        data_dir = data_dir = CONST.__getattribute__('dir_router_data')
-
-        self.vnf_data_dir = data_dir
+        self.snaps_creds = ""
+        self.vnf_data_dir = getattr(config.CONF, 'dir_router_data')
         self.opnfv_vnf_data_dir = "opnfv-vnf-data/"
         self.command_template_dir = "command_template/"
         self.test_scenario_yaml = "test_scenario.yaml"
@@ -81,8 +75,8 @@ class Utilvnf(object):
         case_dir = pkg_resources.resource_filename(
             'functest', 'opnfv_tests/vnf/router')
 
-        config_file_name = CONST.__getattribute__(
-            'vnf_{}_config'.format("vyos_vrouter"))
+        config_file_name = getattr(
+            config.CONF, 'vnf_{}_config'.format("vyos_vrouter"))
 
         config_file = os.path.join(case_dir, config_file_name)
 
@@ -112,32 +106,15 @@ class Utilvnf(object):
         self.test_result_json_file = "test_result.json"
         if os.path.isfile(self.test_result_json_file):
             os.remove(self.test_result_json_file)
-            self.logger.debug("removed %s" % self.test_result_json_file)
+            self.logger.debug("removed %s", self.test_result_json_file)
 
     def get_nova_client(self):
-        creds = self.get_nova_credentials()
-        loader = loading.get_plugin_loader('password')
-        auth = loader.load_from_options(**creds)
-        sess = session.Session(auth=auth)
-        nova_client = novaclient.Client(NOVA_CLIENT_API_VERSION, session=sess)
+        nova_client = nova_utils.nova_client(self.snaps_creds)
 
         return nova_client
 
-    def set_credentials(self, username, password, auth_url,
-                        tenant_name, region_name="RegionOne"):
-        self.username = username
-        self.password = password
-        self.auth_url = auth_url
-        self.tenant_name = tenant_name
-        self.region_name = region_name
-
-    def get_nova_credentials(self):
-        creds = {}
-        creds['username'] = self.username
-        creds['password'] = self.password
-        creds['auth_url'] = self.auth_url
-        creds['tenant_name'] = self.tenant_name
-        return creds
+    def set_credentials(self, snaps_creds):
+        self.snaps_creds = snaps_creds
 
     def get_address(self, server_name, network_name):
         nova_client = self.get_nova_client()
@@ -149,7 +126,7 @@ class Utilvnf(object):
                 break
 
         address = server.addresses[
-                      network_name][NOVA_CILENT_NETWORK_INFO_INDEX]["addr"]
+            network_name][NOVA_CILENT_NETWORK_INFO_INDEX]["addr"]
 
         return address
 
@@ -163,8 +140,7 @@ class Utilvnf(object):
                 break
 
         mac_address = server.addresses[network_name][
-                          NOVA_CILENT_NETWORK_INFO_INDEX][
-                          "OS-EXT-IPS-MAC:mac_addr"]
+            NOVA_CILENT_NETWORK_INFO_INDEX]["OS-EXT-IPS-MAC:mac_addr"]
 
         return mac_address
 
@@ -248,10 +224,7 @@ class Utilvnf(object):
             vnf["user"] = self.image["user"]
             vnf["pass"] = self.image["pass"]
 
-            if vnf_name == target_vnf_name:
-                vnf["target_vnf_flag"] = True
-            else:
-                vnf["target_vnf_flag"] = False
+            vnf["target_vnf_flag"] = bool(vnf_name == target_vnf_name)
 
             self.logger.debug("vnf name : " + vnf_name)
             self.logger.debug(vnf_name + " floating ip address : " +
@@ -273,14 +246,16 @@ class Utilvnf(object):
 
         return vnf_info_list
 
-    def get_target_vnf(self, vnf_info_list):
+    @staticmethod
+    def get_target_vnf(vnf_info_list):
         for vnf in vnf_info_list:
             if vnf["target_vnf_flag"]:
                 return vnf
 
         return None
 
-    def get_reference_vnf_list(self, vnf_info_list):
+    @staticmethod
+    def get_reference_vnf_list(vnf_info_list):
         reference_vnf_list = []
         for vnf in vnf_info_list:
             if not vnf["target_vnf_flag"]:
@@ -288,14 +263,16 @@ class Utilvnf(object):
 
         return reference_vnf_list
 
-    def get_vnf_info(self, vnf_info_list, vnf_name):
+    @staticmethod
+    def get_vnf_info(vnf_info_list, vnf_name):
         for vnf in vnf_info_list:
             if vnf["vnf_name"] == vnf_name:
                 return vnf
 
         return None
 
-    def convert_functional_test_result(self, result_data_list):
+    @staticmethod
+    def convert_functional_test_result(result_data_list):
         result = {}
         for result_data in result_data_list:
             test_kind = result_data["test_kind"]
@@ -333,11 +310,12 @@ class Utilvnf(object):
             output_json_data = json.dumps(test_result,
                                           sort_keys=True,
                                           indent=4)
-            self.logger.debug("test_result %s" % output_json_data)
+            self.logger.debug("test_result %s", output_json_data)
         else:
-            self.logger.debug("Not found %s" % self.test_result_json_file)
+            self.logger.debug("Not found %s", self.test_result_json_file)
 
-    def get_test_scenario(self, file_path):
+    @staticmethod
+    def get_test_scenario(file_path):
         test_scenario_file = open(file_path,
                                   'r')
         test_scenario_yaml = yaml.safe_load(test_scenario_file)

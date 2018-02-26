@@ -5,6 +5,8 @@
 # which accompanies this distribution, and is available at
 # http://www.apache.org/licenses/LICENSE-2.0
 
+# pylint: disable=missing-docstring
+
 import copy
 import logging
 import os
@@ -13,7 +15,6 @@ import unittest
 import mock
 
 from functest.utils import openstack_utils
-from functest.utils.constants import CONST
 
 
 class OSUtilsTesting(unittest.TestCase):
@@ -135,25 +136,8 @@ class OSUtilsTesting(unittest.TestCase):
         mock_obj.configure_mock(**attrs)
         self.volume = mock_obj
 
-        mock_obj = mock.Mock()
-        attrs = {'id': 'volume_type_id',
-                 'name': 'test_volume_type',
-                 'is_public': True}
-        mock_obj.configure_mock(**attrs)
-        self.volume_types = [mock_obj]
-
-        mock_obj = mock.Mock()
-        attrs = {'id': 'volume_type_id',
-                 'name': 'test_volume_type',
-                 'is_public': False}
-        mock_obj.configure_mock(**attrs)
-        self.volume_types.append(mock_obj)
-
         self.cinder_client = mock.Mock()
         attrs = {'volumes.list.return_value': [self.volume],
-                 'volume_types.list.return_value': self.volume_types,
-                 'volume_types.create.return_value': self.volume_types[0],
-                 'volume_types.delete.return_value': mock.Mock(),
                  'quotas.update.return_value': mock.Mock(),
                  'volumes.detach.return_value': mock.Mock(),
                  'volumes.force_delete.return_value': mock.Mock(),
@@ -374,33 +358,6 @@ class OSUtilsTesting(unittest.TestCase):
 
     def test_get_credentials_missing_endpoint_type(self):
         self._get_credentials_missing_env('OS_ENDPOINT_TYPE')
-
-    def _test_source_credentials(self, msg, key='OS_TENANT_NAME',
-                                 value='admin'):
-        try:
-            del os.environ[key]
-        except:
-            pass
-        f = 'rc_file'
-        with mock.patch('__builtin__.open', mock.mock_open(read_data=msg),
-                        create=True) as m:
-            m.return_value.__iter__ = lambda self: iter(self.readline, '')
-            openstack_utils.source_credentials(f)
-            m.assert_called_once_with(f, 'r')
-            self.assertEqual(os.environ[key], value)
-
-    def test_source_credentials(self):
-        self._test_source_credentials('OS_TENANT_NAME=admin')
-        self._test_source_credentials('OS_TENANT_NAME= admin')
-        self._test_source_credentials('OS_TENANT_NAME = admin')
-        self._test_source_credentials('OS_TENANT_NAME = "admin"')
-        self._test_source_credentials('export OS_TENANT_NAME=admin')
-        self._test_source_credentials('export OS_TENANT_NAME =admin')
-        self._test_source_credentials('export OS_TENANT_NAME = admin')
-        self._test_source_credentials('export OS_TENANT_NAME = "admin"')
-        # This test will fail as soon as rc_file is fixed
-        self._test_source_credentials(
-            'export "\'OS_TENANT_NAME\'" = "\'admin\'"')
 
     @mock.patch('functest.utils.openstack_utils.os.getenv',
                 return_value=None)
@@ -1477,7 +1434,7 @@ class OSUtilsTesting(unittest.TestCase):
                         return_value=True), \
             mock.patch('functest.utils.openstack_utils.get_image_id',
                        return_value=''), \
-            mock.patch('__builtin__.open',
+            mock.patch('six.moves.builtins.open',
                        mock.mock_open(read_data='1')) as m:
                 self.assertEqual(openstack_utils.
                                  create_glance_image(self.glance_client,
@@ -1525,41 +1482,6 @@ class OSUtilsTesting(unittest.TestCase):
                          None)
         self.assertTrue(mock_logger_error.called)
 
-    def test_list_volume_types_default_private(self):
-        self.assertEqual(openstack_utils.
-                         list_volume_types(self.cinder_client,
-                                           public=False,
-                                           private=True),
-                         [self.volume_types[1]])
-
-    def test_list_volume_types_default_public(self):
-        self.assertEqual(openstack_utils.
-                         list_volume_types(self.cinder_client,
-                                           public=True,
-                                           private=False),
-                         [self.volume_types[0]])
-
-    @mock.patch('functest.utils.openstack_utils.logger.error')
-    def test_list_volume_types_exception(self, mock_logger_error):
-        self.assertEqual(openstack_utils.
-                         list_volume_types(Exception),
-                         None)
-        self.assertTrue(mock_logger_error.called)
-
-    def test_create_volume_type_default(self):
-        self.assertEqual(openstack_utils.
-                         create_volume_type(self.cinder_client,
-                                            'test_volume_type'),
-                         self.volume_types[0])
-
-    @mock.patch('functest.utils.openstack_utils.logger.error')
-    def test_create_volume_type_exception(self, mock_logger_error):
-        self.assertEqual(openstack_utils.
-                         create_volume_type(Exception,
-                                            'test_volume_type'),
-                         None)
-        self.assertTrue(mock_logger_error.called)
-
     def test_update_cinder_quota_default(self):
         self.assertTrue(openstack_utils.
                         update_cinder_quota(self.cinder_client,
@@ -1595,18 +1517,6 @@ class OSUtilsTesting(unittest.TestCase):
                          delete_volume(Exception,
                                        'volume_id',
                                        forced=True))
-        self.assertTrue(mock_logger_error.called)
-
-    def test_delete_volume_type_default(self):
-        self.assertTrue(openstack_utils.
-                        delete_volume_type(self.cinder_client,
-                                           self.volume_types[0]))
-
-    @mock.patch('functest.utils.openstack_utils.logger.error')
-    def test_delete_volume_type_exception(self, mock_logger_error):
-        self.assertFalse(openstack_utils.
-                         delete_volume_type(Exception,
-                                            self.volume_types[0]))
         self.assertTrue(mock_logger_error.called)
 
     def test_get_tenants_default(self):
@@ -1667,7 +1577,7 @@ class OSUtilsTesting(unittest.TestCase):
     def test_create_tenant_default(self):
         with mock.patch('functest.utils.openstack_utils.'
                         'is_keystone_v3', return_value=True):
-            CONST.__setattr__('OS_PROJECT_DOMAIN_NAME', 'Default')
+            os.environ['OS_PROJECT_DOMAIN_NAME'] = 'Default'
             self.assertEqual(openstack_utils.
                              create_tenant(self.keystone_client,
                                            'test_tenant',

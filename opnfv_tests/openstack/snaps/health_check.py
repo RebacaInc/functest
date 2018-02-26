@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 # Copyright (c) 2017 Cable Television Laboratories, Inc. and others.
 #
 # This program and the accompanying materials
@@ -5,6 +7,8 @@
 # which accompanies this distribution, and is available at
 #
 # http://www.apache.org/licenses/LICENSE-2.0
+
+"""snaps_health_check test case implementation"""
 
 import unittest
 
@@ -40,5 +44,6 @@ class HealthCheck(SnapsTestRunner):
                 ext_net_name=self.ext_net_name,
                 use_keystone=self.use_keystone,
                 flavor_metadata=self.flavor_metadata,
-                image_metadata=self.image_metadata))
-        return super(self.__class__, self).run()
+                image_metadata=self.image_metadata,
+                netconf_override=self.netconf_override))
+        return super(HealthCheck, self).run()

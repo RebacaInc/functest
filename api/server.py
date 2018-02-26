@@ -20,6 +20,7 @@ import pkg_resources
 
 from flask import Flask
 from flask_restful import Api
+from flasgger import Swagger
 
 from functest.api.base import ApiResource
 from functest.api.common import api_utils
@@ -34,6 +35,7 @@ LOGGER = logging.getLogger(__name__)
 
 APP = Flask(__name__)
 API = Api(APP)
+Swagger(APP)
 
 
 @APP.teardown_request
@@ -97,6 +99,7 @@ def main():
     """Entry point"""
     logging.config.fileConfig(pkg_resources.resource_filename(
         'functest', 'ci/logging.ini'))
+    logging.captureWarnings(True)
     LOGGER.info('Starting Functest server')
     api_add_resource()
     init_db()

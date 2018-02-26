@@ -11,10 +11,16 @@
 
 import logging
 import time
+import uuid
 
-import functest.core.testcase as base
-from functest.utils.constants import CONST
-import functest.utils.openstack_utils as os_utils
+from snaps.config.user import UserConfig
+from snaps.config.project import ProjectConfig
+from snaps.openstack.create_user import OpenStackUser
+from snaps.openstack.create_project import OpenStackProject
+from snaps.openstack.tests import openstack_tests
+
+from functest.core import testcase
+from functest.utils import constants
 
 __author__ = ("Morgan Richomme <morgan.richomme@orange.com>, "
               "Valentin Boucher <valentin.boucher@orange.com>")
@@ -36,32 +42,37 @@ class VnfTestException(Exception):
     """Raise when VNF cannot be tested."""
 
 
-class VnfOnBoarding(base.TestCase):
+class VnfOnBoarding(testcase.TestCase):
+    # pylint: disable=too-many-instance-attributes
     """Base model for VNF test cases."""
 
     __logger = logging.getLogger(__name__)
 
     def __init__(self, **kwargs):
         super(VnfOnBoarding, self).__init__(**kwargs)
-        self.exist_obj = {'tenant': False, 'user': False}
-        self.tenant_name = CONST.__getattribute__(
-            'vnf_{}_tenant_name'.format(self.case_name))
-        self.creds = {}
+        self.uuid = uuid.uuid4()
+        self.user_name = "{}-{}".format(self.case_name, self.uuid)
+        self.tenant_name = "{}-{}".format(self.case_name, self.uuid)
+        self.snaps_creds = {}
+        self.created_object = []
+        self.os_project = None
+        self.tenant_description = "Created by OPNFV Functest: {}".format(
+            self.case_name)
 
     def run(self, **kwargs):
         """
         Run of the VNF test case:
 
-            * Deploy an orchestrator if needed (e.g. heat, cloudify, ONAP),
+            * Deploy an orchestrator if needed (e.g. heat, cloudify, ONAP,...),
             * Deploy the VNF,
             * Perform tests on the VNF
 
           A VNF test case is successfull when the 3 steps are PASS
           If one of the step is FAIL, the test case is FAIL
 
-          Returns:
-            TestCase.EX_OK if result is 'PASS'.
-            TestCase.EX_TESTCASE_FAILED otherwise.
+        Returns:
+          TestCase.EX_OK if result is 'PASS'.
+          TestCase.EX_TESTCASE_FAILED otherwise.
         """
         self.start_time = time.time()
 
@@ -73,15 +84,14 @@ class VnfOnBoarding(base.TestCase):
                 self.stop_time = time.time()
                 # Calculation with different weight depending on the steps TODO
                 self.result = 100
-                return base.TestCase.EX_OK
-            else:
-                self.result = 0
-                self.stop_time = time.time()
-                return base.TestCase.EX_TESTCASE_FAILED
+                return testcase.TestCase.EX_OK
+            self.result = 0
+            self.stop_time = time.time()
+            return testcase.TestCase.EX_TESTCASE_FAILED
         except Exception:  # pylint: disable=broad-except
             self.stop_time = time.time()
             self.__logger.exception("Exception on VNF testing")
-            return base.TestCase.EX_TESTCASE_FAILED
+            return testcase.TestCase.EX_TESTCASE_FAILED
 
     def prepare(self):
         """
@@ -96,25 +106,31 @@ class VnfOnBoarding(base.TestCase):
         Raise VnfPreparationException in case of problem
         """
         try:
-            tenant_description = CONST.__getattribute__(
-                'vnf_{}_tenant_description'.format(self.case_name))
-            self.__logger.info("Prepare VNF: %s, description: %s",
-                               self.tenant_name, tenant_description)
-            keystone_client = os_utils.get_keystone_client()
-            self.exist_obj['tenant'] = (
-                not os_utils.get_or_create_tenant_for_vnf(
-                    keystone_client,
-                    self.tenant_name,
-                    tenant_description))
-            self.exist_obj['user'] = not os_utils.get_or_create_user_for_vnf(
-                keystone_client, self.tenant_name)
-            self.creds = {
-                "tenant": self.tenant_name,
-                "username": self.tenant_name,
-                "password": self.tenant_name,
-                "auth_url": os_utils.get_credentials()['auth_url']
-                }
-            return base.TestCase.EX_OK
+            self.__logger.info(
+                "Prepare VNF: %s, description: %s", self.case_name,
+                self.tenant_description)
+            snaps_creds = openstack_tests.get_credentials(
+                os_env_file=constants.ENV_FILE)
+
+            self.os_project = OpenStackProject(
+                snaps_creds,
+                ProjectConfig(
+                    name=self.tenant_name,
+                    description=self.tenant_description
+                ))
+            self.os_project.create()
+            self.created_object.append(self.os_project)
+            user_creator = OpenStackUser(
+                snaps_creds,
+                UserConfig(
+                    name=self.user_name,
+                    password=str(uuid.uuid4()),
+                    roles={'admin': self.tenant_name}))
+            user_creator.create()
+            self.created_object.append(user_creator)
+            self.snaps_creds = user_creator.get_os_creds(self.tenant_name)
+
+            return testcase.TestCase.EX_OK
         except Exception:  # pylint: disable=broad-except
             self.__logger.exception("Exception raised during VNF preparation")
             raise VnfPreparationException
@@ -123,9 +139,8 @@ class VnfOnBoarding(base.TestCase):
         """
         Deploy an orchestrator (optional).
 
-        If function overwritten
-        raise orchestratorDeploymentException if error during orchestrator
-        deployment
+        If this method is overriden then raise orchestratorDeploymentException
+        if error during orchestrator deployment
         """
         self.__logger.info("Deploy orchestrator (if necessary)")
         return True
@@ -138,10 +153,8 @@ class VnfOnBoarding(base.TestCase):
         The details section MAY be updated in the vnf test cases.
 
         The deployment can be executed via a specific orchestrator
-        or using nuild-in orchestrators such as:
-
-            * heat, openbaton, cloudify (available on all scenario),
-            * open-o (on open-o scenarios)
+        or using build-in orchestrators such as heat, OpenBaton, cloudify,
+        juju, onap, ...
 
         Returns:
             True if the VNF is properly deployed
@@ -184,9 +197,9 @@ class VnfOnBoarding(base.TestCase):
             * the user,
             * the tenant
         """
-        self.__logger.info("test cleaning")
-        keystone_client = os_utils.get_keystone_client()
-        if not self.exist_obj['tenant']:
-            os_utils.delete_tenant(keystone_client, self.tenant_name)
-        if not self.exist_obj['user']:
-            os_utils.delete_user(keystone_client, self.tenant_name)
+        self.__logger.info('Removing the VNF resources ..')
+        for creator in reversed(self.created_object):
+            try:
+                creator.clean()
+            except Exception as exc:  # pylint: disable=broad-except
+                self.__logger.error('Unexpected error cleaning - %s', exc)

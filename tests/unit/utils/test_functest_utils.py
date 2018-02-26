@@ -7,22 +7,24 @@
 # which accompanies this distribution, and is available at
 # http://www.apache.org/licenses/LICENSE-2.0
 
+# pylint: disable=missing-docstring
+
 import logging
-import pkg_resources
 import os
 import time
 import unittest
 
 import mock
-import requests
+import pkg_resources
 from six.moves import urllib
 
-from functest.tests.unit import test_utils
 from functest.utils import functest_utils
-from functest.utils.constants import CONST
 
 
 class FunctestUtilsTesting(unittest.TestCase):
+
+    readline = 0
+    test_ip = ['10.1.23.4', '10.1.14.15', '10.1.16.15']
 
     def setUp(self):
         self.url = 'http://www.opnfv.org/'
@@ -53,8 +55,6 @@ class FunctestUtilsTesting(unittest.TestCase):
         self.cmd = 'test_cmd'
         self.output_file = 'test_output_file'
         self.testname = 'testname'
-        self.testcase_dict = {'case_name': 'testname',
-                              'criteria': self.criteria}
         self.parameter = 'general.openstack.image_name'
         self.config_yaml = pkg_resources.resource_filename(
             'functest', 'ci/config_functest.yaml')
@@ -97,54 +97,6 @@ class FunctestUtilsTesting(unittest.TestCase):
             m.assert_called_once_with(dest, 'wb')
             self.assertTrue(mock_sh.called)
 
-    def test_get_version_daily_job(self):
-        CONST.__setattr__('BUILD_TAG', self.build_tag)
-        self.assertEqual(functest_utils.get_version(), self.version)
-
-    def test_get_version_weekly_job(self):
-        CONST.__setattr__('BUILD_TAG', self.build_tag_week)
-        self.assertEqual(functest_utils.get_version(), self.version)
-
-    def test_get_version_with_dummy_build_tag(self):
-        CONST.__setattr__('BUILD_TAG', 'whatever')
-        self.assertEqual(functest_utils.get_version(), 'unknown')
-
-    def test_get_version_unknown(self):
-        CONST.__setattr__('BUILD_TAG', 'unknown_build_tag')
-        self.assertEqual(functest_utils.get_version(), "unknown")
-
-    @mock.patch('functest.utils.functest_utils.logger.info')
-    def test_logger_test_results(self, mock_logger_info):
-        CONST.__setattr__('results_test_db_url', self.db_url)
-        CONST.__setattr__('BUILD_TAG', self.build_tag)
-        CONST.__setattr__('NODE_NAME', self.node_name)
-        CONST.__setattr__('DEPLOY_SCENARIO', self.scenario)
-        with mock.patch('functest.utils.functest_utils.get_version',
-                        return_value=self.version):
-            functest_utils.logger_test_results(self.project, self.case_name,
-                                               self.status, self.details)
-            mock_logger_info.assert_called_once_with(
-                "\n"
-                "****************************************\n"
-                "\t %(p)s/%(n)s results \n\n"
-                "****************************************\n"
-                "DB:\t%(db)s\n"
-                "pod:\t%(pod)s\n"
-                "version:\t%(v)s\n"
-                "scenario:\t%(s)s\n"
-                "status:\t%(c)s\n"
-                "build tag:\t%(b)s\n"
-                "details:\t%(d)s\n"
-                % {'p': self.project,
-                    'n': self.case_name,
-                    'db': CONST.__getattribute__('results_test_db_url'),
-                    'pod': self.node_name,
-                    'v': self.version,
-                    's': self.scenario,
-                    'c': self.status,
-                    'b': self.build_tag,
-                    'd': self.details})
-
     def _get_env_dict(self, var):
         dic = {'INSTALLER_TYPE': self.installer,
                'DEPLOY_SCENARIO': self.scenario,
@@ -152,87 +104,6 @@ class FunctestUtilsTesting(unittest.TestCase):
                'BUILD_TAG': self.build_tag}
         dic.pop(var, None)
         return dic
-
-    def _test_push_results_to_db_missing_env(self, env_var):
-        dic = self._get_env_dict(env_var)
-        CONST.__setattr__('results_test_db_url', self.db_url)
-        with mock.patch.dict(os.environ,
-                             dic,
-                             clear=True), \
-                mock.patch('functest.utils.functest_utils.logger.error') \
-                as mock_logger_error:
-            functest_utils.push_results_to_db(self.project, self.case_name,
-                                              self.start_date, self.stop_date,
-                                              self.result, self.details)
-            mock_logger_error.assert_called_once_with("Please set env var: " +
-                                                      str("\'" + env_var +
-                                                          "\'"))
-
-    def test_push_results_to_db_missing_installer(self):
-        self._test_push_results_to_db_missing_env('INSTALLER_TYPE')
-
-    def test_push_results_to_db_missing_scenario(self):
-        self._test_push_results_to_db_missing_env('DEPLOY_SCENARIO')
-
-    def test_push_results_to_db_missing_nodename(self):
-        self._test_push_results_to_db_missing_env('NODE_NAME')
-
-    def test_push_results_to_db_missing_buildtag(self):
-        self._test_push_results_to_db_missing_env('BUILD_TAG')
-
-    def test_push_results_to_db_request_post_failed(self):
-        dic = self._get_env_dict(None)
-        CONST.__setattr__('results_test_db_url', self.db_url)
-        with mock.patch.dict(os.environ,
-                             dic,
-                             clear=True), \
-                mock.patch('functest.utils.functest_utils.logger.error') \
-                as mock_logger_error, \
-                mock.patch('functest.utils.functest_utils.requests.post',
-                           side_effect=requests.RequestException):
-            self.assertFalse(functest_utils.
-                             push_results_to_db(self.project, self.case_name,
-                                                self.start_date,
-                                                self.stop_date,
-                                                self.result, self.details))
-            mock_logger_error.assert_called_once_with(test_utils.
-                                                      RegexMatch("Pushing "
-                                                                 "Result to"
-                                                                 " DB"
-                                                                 "(\S+\s*) "
-                                                                 "failed:"))
-
-    def test_push_results_to_db_request_post_exception(self):
-        dic = self._get_env_dict(None)
-        CONST.__setattr__('results_test_db_url', self.db_url)
-        with mock.patch.dict(os.environ,
-                             dic,
-                             clear=True), \
-                mock.patch('functest.utils.functest_utils.logger.error') \
-                as mock_logger_error, \
-                mock.patch('functest.utils.functest_utils.requests.post',
-                           side_effect=Exception):
-            self.assertFalse(functest_utils.
-                             push_results_to_db(self.project, self.case_name,
-                                                self.start_date,
-                                                self.stop_date,
-                                                self.result, self.details))
-            self.assertTrue(mock_logger_error.called)
-
-    def test_push_results_to_db_default(self):
-        dic = self._get_env_dict(None)
-        CONST.__setattr__('results_test_db_url', self.db_url)
-        with mock.patch.dict(os.environ,
-                             dic,
-                             clear=True), \
-                mock.patch('functest.utils.functest_utils.requests.post'):
-            self.assertTrue(functest_utils.
-                            push_results_to_db(self.project, self.case_name,
-                                               self.start_date,
-                                               self.stop_date,
-                                               self.result, self.details))
-    readline = 0
-    test_ip = ['10.1.23.4', '10.1.14.15', '10.1.16.15']
 
     @staticmethod
     def readline_side():
@@ -257,7 +128,7 @@ class FunctestUtilsTesting(unittest.TestCase):
             self.assertEqual(functest_utils.get_resolvconf_ns(),
                              self.test_ip[1:])
 
-    def _get_environ(self, var):
+    def _get_environ(self, var, *args):  # pylint: disable=unused-argument
         if var == 'INSTALLER_TYPE':
             return self.installer
         elif var == 'DEPLOY_SCENARIO':
@@ -274,8 +145,8 @@ class FunctestUtilsTesting(unittest.TestCase):
     def cmd_readline(self):
         return 'test_value\n'
 
-    @mock.patch('functest.utils.functest_utils.logger.error')
-    @mock.patch('functest.utils.functest_utils.logger.info')
+    @mock.patch('functest.utils.functest_utils.LOGGER.error')
+    @mock.patch('functest.utils.functest_utils.LOGGER.info')
     def test_execute_command_args_present_with_error(self, mock_logger_info,
                                                      mock_logger_error):
         with mock.patch('functest.utils.functest_utils.subprocess.Popen') \
@@ -305,7 +176,7 @@ class FunctestUtilsTesting(unittest.TestCase):
             mopen.assert_called_once_with(self.output_file, "w")
             mock_logger_error.assert_called_once_with(self.error_msg)
 
-    @mock.patch('functest.utils.functest_utils.logger.info')
+    @mock.patch('functest.utils.functest_utils.LOGGER.info')
     def test_execute_command_args_present_with_success(self, mock_logger_info,
                                                        ):
         with mock.patch('functest.utils.functest_utils.subprocess.Popen') \
@@ -382,32 +253,6 @@ class FunctestUtilsTesting(unittest.TestCase):
     def _get_functest_config(self, var):
         return var
 
-    @mock.patch('functest.utils.functest_utils.logger.error')
-    def test_get_dict_by_test(self, mock_logger_error):
-        with mock.patch('six.moves.builtins.open', mock.mock_open()), \
-                mock.patch('functest.utils.functest_utils.yaml.safe_load') \
-                as mock_yaml:
-            mock_obj = mock.Mock()
-            attrs = {'get.return_value': [{'testcases': [self.testcase_dict]}]}
-            mock_obj.configure_mock(**attrs)
-
-            mock_yaml.return_value = mock_obj
-
-            self.assertDictEqual(functest_utils.
-                                 get_dict_by_test(self.testname),
-                                 self.testcase_dict)
-
-    @mock.patch('functest.utils.functest_utils.get_dict_by_test')
-    def test_get_criteria_by_test_default(self, mock_get_dict_by_test):
-        mock_get_dict_by_test.return_value = self.testcase_dict
-        self.assertEqual(functest_utils.get_criteria_by_test(self.testname),
-                         self.criteria)
-
-    @mock.patch('functest.utils.functest_utils.get_dict_by_test')
-    def test_get_criteria_by_test_failed(self, mock_get_dict_by_test):
-        mock_get_dict_by_test.return_value = None
-        self.assertIsNone(functest_utils.get_criteria_by_test(self.testname))
-
     def test_get_parameter_from_yaml_failed(self):
         self.file_yaml['general'] = None
         with mock.patch('six.moves.builtins.open', mock.mock_open()), \
@@ -448,7 +293,7 @@ class FunctestUtilsTesting(unittest.TestCase):
             resp = functest_utils.get_functest_yaml()
             self.assertEqual(resp, self.file_yaml)
 
-    @mock.patch('functest.utils.functest_utils.logger.info')
+    @mock.patch('functest.utils.functest_utils.LOGGER.info')
     def test_print_separator(self, mock_logger_info):
         functest_utils.print_separator()
         mock_logger_info.assert_called_once_with("======================="

@@ -18,43 +18,58 @@ Verifies that:
 import logging
 import logging.config
 import os
-import pkg_resources
 import socket
-import time
-from urlparse import urlparse
 
+import pkg_resources
+from six.moves import urllib
+from snaps.openstack.tests import openstack_tests
 from snaps.openstack.utils import glance_utils
 from snaps.openstack.utils import keystone_utils
 from snaps.openstack.utils import neutron_utils
 from snaps.openstack.utils import nova_utils
-from snaps.openstack.tests import openstack_tests
+
+from functest.utils import constants
+from functest.opnfv_tests.openstack.snaps import snaps_utils
 
 __author__ = "Jose Lausuch <jose.lausuch@ericsson.com>"
 
 LOGGER = logging.getLogger(__name__)
 
 
-def verify_connectivity(adress, port, timeout=10):
-    """ Returns true if an ip/port is reachable"""
-    connection = socket.socket()
-    count = 0
-    while count < timeout:
-        try:
-            connection.connect((adress, port))
-            LOGGER.debug('%s:%s is reachable!', adress, port)
-            return True
-        except socket.error:
-            count += 1
-            time.sleep(1)
-            continue
-    LOGGER.error('%s:%s is not reachable.', adress, port)
+def verify_connectivity(endpoint):
+    """ Returns true if an hostname/port is reachable"""
+    try:
+        connection = socket.socket()
+        connection.settimeout(10)
+        url = urllib.parse.urlparse(endpoint)
+        port = url.port
+        if not port:
+            port = 443 if url.scheme == "https" else 80
+        connection.connect((url.hostname, port))
+        LOGGER.debug('%s:%s is reachable!', url.hostname, port)
+        return True
+    except socket.error:
+        LOGGER.error('%s:%s is not reachable.', url.hostname, port)
+    except Exception:  # pylint: disable=broad-except
+        LOGGER.exception(
+            'Errors when verifying connectivity to %s:%s', url.hostname, port)
     return False
+
+
+def get_auth_token(os_creds):
+    """ Get auth token """
+    sess = keystone_utils.keystone_session(os_creds)
+    try:
+        return sess.get_token()
+    except Exception as error:
+        LOGGER.error("Got token ...FAILED")
+        raise error
 
 
 class CheckDeployment(object):
     """ Check deployment class."""
 
-    def __init__(self, rc_file='/home/opnfv/functest/conf/openstack.creds'):
+    def __init__(self, rc_file=constants.ENV_FILE):
         self.rc_file = rc_file
         self.services = ('compute', 'network', 'image')
         self.os_creds = None
@@ -68,21 +83,22 @@ class CheckDeployment(object):
                               format(self.rc_file))
 
     def check_auth_endpoint(self):
-        """ Verifies connectivity to the OS_AUTH_URL given in the RC file """
+        """ Verifies connectivity to the OS_AUTH_URL given in the RC file
+        and get auth token"""
         rc_endpoint = self.os_creds.auth_url
-        if not (verify_connectivity(urlparse(rc_endpoint).hostname,
-                                    urlparse(rc_endpoint).port)):
+        if not verify_connectivity(rc_endpoint):
             raise Exception("OS_AUTH_URL {} is not reachable.".
                             format(rc_endpoint))
         LOGGER.info("Connectivity to OS_AUTH_URL %s ...OK", rc_endpoint)
+        if get_auth_token(self.os_creds):
+            LOGGER.info("Got token ...OK")
 
     def check_public_endpoint(self):
         """ Gets the public endpoint and verifies connectivity to it """
         public_endpoint = keystone_utils.get_endpoint(self.os_creds,
                                                       'identity',
                                                       interface='public')
-        if not (verify_connectivity(urlparse(public_endpoint).hostname,
-                                    urlparse(public_endpoint).port)):
+        if not verify_connectivity(public_endpoint):
             raise Exception("Public endpoint {} is not reachable.".
                             format(public_endpoint))
         LOGGER.info("Connectivity to the public endpoint %s ...OK",
@@ -93,8 +109,7 @@ class CheckDeployment(object):
         endpoint = keystone_utils.get_endpoint(self.os_creds,
                                                service,
                                                interface='public')
-        if not (verify_connectivity(urlparse(endpoint).hostname,
-                                    urlparse(endpoint).port)):
+        if not verify_connectivity(endpoint):
             raise Exception("{} endpoint {} is not reachable.".
                             format(service, endpoint))
         LOGGER.info("Connectivity to endpoint '%s' %s ...OK",
@@ -130,10 +145,18 @@ class CheckDeployment(object):
             LOGGER.error("Glance service ...FAILED")
             raise error
 
+    def check_ext_net(self):
+        """ checks if external network exists """
+        ext_net = snaps_utils.get_ext_net_name(self.os_creds)
+        if ext_net:
+            LOGGER.info("External network found: %s", ext_net)
+        else:
+            raise Exception("ERROR: No external networks in the deployment.")
+
     def check_all(self):
         """
         Calls all the class functions and returns 0 if all of them succeed.
-        This is the method called by prepare_env or CLI
+        This is the method called by CLI
         """
         self.check_rc()
         try:
@@ -152,6 +175,7 @@ class CheckDeployment(object):
         self.check_nova()
         self.check_neutron()
         self.check_glance()
+        self.check_ext_net()
         return 0
 
 
@@ -159,5 +183,6 @@ def main():
     """Entry point"""
     logging.config.fileConfig(pkg_resources.resource_filename(
         'functest', 'ci/logging.ini'))
+    logging.captureWarnings(True)
     deployment = CheckDeployment()
     return deployment.check_all()

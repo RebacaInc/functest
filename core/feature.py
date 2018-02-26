@@ -14,11 +14,10 @@ helpers to run any python method or any bash command.
 """
 
 import logging
+import subprocess
 import time
 
 import functest.core.testcase as base
-import functest.utils.functest_utils as ft_utils
-from functest.utils.constants import CONST
 
 __author__ = ("Serena Feng <feng.xiaowei@zte.com.cn>, "
               "Cedric Ollivier <cedric.ollivier@orange.com>")
@@ -28,11 +27,11 @@ class Feature(base.TestCase):
     """Base model for single feature."""
 
     __logger = logging.getLogger(__name__)
+    dir_results = "/home/opnfv/functest/results"
 
     def __init__(self, **kwargs):
         super(Feature, self).__init__(**kwargs)
-        self.result_file = "{}/{}.log".format(
-            CONST.__getattribute__('dir_results'), self.case_name)
+        self.result_file = "{}/{}.log".format(self.dir_results, self.case_name)
         try:
             module = kwargs['run']['module']
             self.logger = logging.getLogger(module)
@@ -98,9 +97,6 @@ class Feature(base.TestCase):
             if self.execute(**kwargs) == 0:
                 exit_code = base.TestCase.EX_OK
                 self.result = 100
-            ft_utils.logger_test_results(
-                self.project_name, self.case_name,
-                self.result, self.details)
         except Exception:  # pylint: disable=broad-except
             self.__logger.exception("%s FAILED", self.project_name)
         self.__logger.info("Test result is stored in '%s'", self.result_file)
@@ -126,9 +122,12 @@ class BashFeature(Feature):
         ret = -1
         try:
             cmd = kwargs["cmd"]
-            ret = ft_utils.execute_command(cmd, output_file=self.result_file)
+            with open(self.result_file, 'w+') as f_stdout:
+                proc = subprocess.Popen(cmd.split(), stdout=f_stdout,
+                                        stderr=subprocess.STDOUT)
+            ret = proc.wait()
+            if ret != 0:
+                self.__logger.error("Execute command: %s failed", cmd)
         except KeyError:
             self.__logger.error("Please give cmd as arg. kwargs: %s", kwargs)
-        except Exception:  # pylint: disable=broad-except
-            self.__logger.exception("Execute cmd: %s failed", cmd)
         return ret

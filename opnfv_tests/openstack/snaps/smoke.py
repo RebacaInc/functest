@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 # Copyright (c) 2017 Cable Television Laboratories, Inc. and others.
 #
 # This program and the accompanying materials
@@ -6,10 +8,11 @@
 #
 # http://www.apache.org/licenses/LICENSE-2.0
 
+"""snaps_smoke test case implementation"""
+
 import unittest
 
-from snaps import test_suite_builder
-
+from functest.opnfv_tests.openstack.snaps import snaps_suite_builder
 from functest.opnfv_tests.openstack.snaps.snaps_test_runner import (
     SnapsTestRunner)
 
@@ -33,12 +36,13 @@ class SnapsSmoke(SnapsTestRunner):
         :param kwargs: the arguments to pass on
         :return:
         """
-        test_suite_builder.add_openstack_integration_tests(
+        snaps_suite_builder.add_openstack_integration_tests(
             suite=self.suite,
             os_creds=self.os_creds,
             ext_net_name=self.ext_net_name,
             use_keystone=self.use_keystone,
             flavor_metadata=self.flavor_metadata,
             image_metadata=self.image_metadata,
-            use_floating_ips=self.use_fip)
-        return super(self.__class__, self).run()
+            use_floating_ips=self.use_fip,
+            netconf_override=self.netconf_override)
+        return super(SnapsSmoke, self).run()

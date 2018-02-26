@@ -17,32 +17,27 @@ import time
 import pkg_resources
 import yaml
 
-from snaps.openstack.create_image import OpenStackImage, ImageSettings
-from snaps.openstack.create_flavor import OpenStackFlavor, FlavorSettings
-from snaps.openstack.create_security_group import (
-    OpenStackSecurityGroup,
-    SecurityGroupSettings,
-    SecurityGroupRuleSettings,
-    Direction,
-    Protocol)
-from snaps.openstack.create_network import (
-    OpenStackNetwork,
-    NetworkSettings,
-    SubnetSettings,
-    PortSettings)
-from snaps.openstack.create_router import OpenStackRouter, RouterSettings
-from snaps.openstack.os_credentials import OSCreds
-from snaps.openstack.create_instance import (
-    VmInstanceSettings,
-    OpenStackVmInstance)
-from functest.opnfv_tests.openstack.snaps import snaps_utils
-
 import functest.core.vnf as vnf
 import functest.utils.openstack_utils as os_utils
-from functest.utils.constants import CONST
+from functest.opnfv_tests.openstack.snaps import snaps_utils
+from functest.utils import config
 
 from org.openbaton.cli.errors.errors import NfvoException
 from org.openbaton.cli.agents.agents import MainAgent
+from snaps.config.flavor import FlavorConfig
+from snaps.config.image import ImageConfig
+from snaps.config.network import NetworkConfig, PortConfig, SubnetConfig
+from snaps.config.router import RouterConfig
+from snaps.config.security_group import (
+    Direction, Protocol, SecurityGroupConfig, SecurityGroupRuleConfig)
+from snaps.config.vm_inst import VmInstanceConfig
+from snaps.openstack.utils import keystone_utils
+from snaps.openstack.create_flavor import OpenStackFlavor
+from snaps.openstack.create_image import OpenStackImage
+from snaps.openstack.create_instance import OpenStackVmInstance
+from snaps.openstack.create_network import OpenStackNetwork
+from snaps.openstack.create_router import OpenStackRouter
+from snaps.openstack.create_security_group import OpenStackSecurityGroup
 
 
 __author__ = "Pauls, Michael <michael.pauls@fokus.fraunhofer.de>"
@@ -131,6 +126,8 @@ def get_userdata(orchestrator=dict):
         orchestrator['gvnfm']['userdata']['url'])
     userdata += "sed -i '113i"'\ \ \ \ '"sleep 60' " \
                 "/etc/openbaton/openbaton-vnfm-generic-user-data.sh\n"
+    userdata += ("sed -i s/nfvo.marketplace.port=8082/nfvo.marketplace."
+                 "port=8080/g /etc/openbaton/openbaton-nfvo.properties\n")
     userdata += "echo \"Starting NFVO\"\n"
     userdata += "service openbaton-nfvo restart\n"
     userdata += "echo \"Starting Generic VNFM\"\n"
@@ -142,27 +139,28 @@ def get_userdata(orchestrator=dict):
 class ClearwaterImsVnf(vnf.VnfOnBoarding):
     """Clearwater IMS VNF deployed with openBaton orchestrator"""
 
-    logger = logging.getLogger(__name__)
+    # logger = logging.getLogger(__name__)
 
     def __init__(self, **kwargs):
         if "case_name" not in kwargs:
             kwargs["case_name"] = "orchestra_clearwaterims"
         super(ClearwaterImsVnf, self).__init__(**kwargs)
-        # self.logger = logging.getLogger("functest.ci.run_tests.orchestra")
+        self.logger = logging.getLogger("functest.ci.run_tests.orchestra")
         self.logger.info("kwargs %s", (kwargs))
 
         self.case_dir = pkg_resources.resource_filename(
             'functest', 'opnfv_tests/vnf/ims/')
-        self.data_dir = CONST.__getattribute__('dir_ims_data')
-        self.test_dir = CONST.__getattribute__('dir_repo_vims_test')
+        self.data_dir = getattr(config.CONF, 'dir_ims_data')
+        self.test_dir = getattr(config.CONF, 'dir_repo_vims_test')
         self.created_resources = []
         self.logger.info("%s VNF onboarding test starting", self.case_name)
 
         try:
-            self.config = CONST.__getattribute__(
-                'vnf_{}_config'.format(self.case_name))
+            self.config = getattr(
+                config.CONF, 'vnf_{}_config'.format(self.case_name))
         except BaseException:
             raise Exception("Orchestra VNF config file not found")
+
         config_file = self.case_dir + self.config
 
         self.mano = dict(
@@ -208,15 +206,16 @@ class ClearwaterImsVnf(vnf.VnfOnBoarding):
         super(ClearwaterImsVnf, self).prepare()
 
         self.logger.info("Additional pre-configuration steps")
-        self.logger.info("creds %s", (self.creds))
 
-        self.snaps_creds = OSCreds(
-            username=self.creds['username'],
-            password=self.creds['password'],
-            auth_url=self.creds['auth_url'],
-            project_name=self.creds['tenant'],
-            identity_api_version=int(os_utils.get_keystone_client_version()))
+        public_auth_url = keystone_utils.get_endpoint(
+            self.snaps_creds, 'identity')
 
+        self.creds = {
+                "tenant": self.snaps_creds.project_name,
+                "username": self.snaps_creds.username,
+                "password": self.snaps_creds.password,
+                "auth_url": public_auth_url
+                }
         self.prepare_images()
         self.prepare_flavor()
         self.prepare_security_groups()
@@ -231,11 +230,11 @@ class ClearwaterImsVnf(vnf.VnfOnBoarding):
             if image_file and image_name:
                 image = OpenStackImage(
                     self.snaps_creds,
-                    ImageSettings(name=image_name,
-                                  image_user='cloud',
-                                  img_format='qcow2',
-                                  image_file=image_file,
-                                  public=True))
+                    ImageConfig(name=image_name,
+                                image_user='cloud',
+                                img_format='qcow2',
+                                image_file=image_file,
+                                public=True))
                 image.create()
                 # self.created_resources.append(image);
 
@@ -245,61 +244,46 @@ class ClearwaterImsVnf(vnf.VnfOnBoarding):
             "Creating security group for Open Baton if not yet existing...")
         sg_rules = list()
         sg_rules.append(
-            SecurityGroupRuleSettings(
+            SecurityGroupRuleConfig(
                 sec_grp_name="orchestra-sec-group-allowall",
                 direction=Direction.ingress,
                 protocol=Protocol.tcp,
                 port_range_min=1,
                 port_range_max=65535))
         sg_rules.append(
-            SecurityGroupRuleSettings(
+            SecurityGroupRuleConfig(
                 sec_grp_name="orchestra-sec-group-allowall",
                 direction=Direction.egress,
                 protocol=Protocol.tcp,
                 port_range_min=1,
                 port_range_max=65535))
         sg_rules.append(
-            SecurityGroupRuleSettings(
+            SecurityGroupRuleConfig(
                 sec_grp_name="orchestra-sec-group-allowall",
                 direction=Direction.ingress,
                 protocol=Protocol.udp,
                 port_range_min=1,
                 port_range_max=65535))
         sg_rules.append(
-            SecurityGroupRuleSettings(
+            SecurityGroupRuleConfig(
                 sec_grp_name="orchestra-sec-group-allowall",
                 direction=Direction.egress,
                 protocol=Protocol.udp,
                 port_range_min=1,
                 port_range_max=65535))
         sg_rules.append(
-            SecurityGroupRuleSettings(
+            SecurityGroupRuleConfig(
                 sec_grp_name="orchestra-sec-group-allowall",
                 direction=Direction.ingress,
                 protocol=Protocol.icmp))
         sg_rules.append(
-            SecurityGroupRuleSettings(
+            SecurityGroupRuleConfig(
                 sec_grp_name="orchestra-sec-group-allowall",
                 direction=Direction.egress,
                 protocol=Protocol.icmp))
-        # sg_rules.append(
-        #     SecurityGroupRuleSettings(
-        #         sec_grp_name="orchestra-sec-group-allowall",
-        #         direction=Direction.ingress,
-        #         protocol=Protocol.icmp,
-        #         port_range_min=-1,
-        #         port_range_max=-1))
-        # sg_rules.append(
-        #     SecurityGroupRuleSettings(
-        #         sec_grp_name="orchestra-sec-group-allowall",
-        #         direction=Direction.egress,
-        #         protocol=Protocol.icmp,
-        #         port_range_min=-1,
-        #         port_range_max=-1))
-
         security_group = OpenStackSecurityGroup(
             self.snaps_creds,
-            SecurityGroupSettings(
+            SecurityGroupConfig(
                 name="orchestra-sec-group-allowall",
                 rule_settings=sg_rules))
 
@@ -314,7 +298,7 @@ class ClearwaterImsVnf(vnf.VnfOnBoarding):
         self.logger.info(
             "Create Flavor for Open Baton NFVO if not yet existing")
 
-        flavor_settings = FlavorSettings(
+        flavor_settings = FlavorConfig(
             name=self.mano['requirements']['flavor']['name'],
             ram=self.mano['requirements']['flavor']['ram_min'],
             disk=self.mano['requirements']['flavor']['disk'],
@@ -330,11 +314,11 @@ class ClearwaterImsVnf(vnf.VnfOnBoarding):
         """Create network/subnet/router if they doen't exist yet"""
         self.logger.info(
             "Creating network/subnet/router if they doen't exist yet...")
-        subnet_settings = SubnetSettings(
+        subnet_settings = SubnetConfig(
             name='%s_subnet' %
             self.case_name,
             cidr="192.168.100.0/24")
-        network_settings = NetworkSettings(
+        network_settings = NetworkConfig(
             name='%s_net' %
             self.case_name,
             subnet_settings=[subnet_settings])
@@ -349,7 +333,7 @@ class ClearwaterImsVnf(vnf.VnfOnBoarding):
         self.created_resources.append(orchestra_network)
         orchestra_router = OpenStackRouter(
             self.snaps_creds,
-            RouterSettings(
+            RouterConfig(
                 name='%s_router' %
                 self.case_name,
                 external_gateway=self.mano['details']['external_net_name'],
@@ -373,7 +357,6 @@ class ClearwaterImsVnf(vnf.VnfOnBoarding):
         my_floating_ips = []
         # Filter Floating IPs with tenant id
         for floating_ip in floating_ips:
-            # self.logger.info("Floating IP: %s", floating_ip)
             if floating_ip.get('tenant_id') == tenant_id:
                 my_floating_ips.append(floating_ip.get('floating_ip_address'))
         # Select if Floating IP exist else create new one
@@ -393,9 +376,10 @@ class ClearwaterImsVnf(vnf.VnfOnBoarding):
                     break
         else:
             self.logger.info("Creating floating IP for Open Baton NFVO")
+            keystone_client = os_utils.get_keystone_client(self.creds)
             self.mano['details']['fip'] = snaps_utils.neutron_utils.\
                 create_floating_ip(
-                    neutron_client,
+                    neutron_client, keystone_client,
                     self.mano['details']['external_net_name'])
             self.logger.info(
                 "Created floating IP for Open Baton NFVO %s",
@@ -453,21 +437,21 @@ class ClearwaterImsVnf(vnf.VnfOnBoarding):
                          self.mano['details']['network']['id'])
         self.logger.debug("userdata: %s\n", userdata)
         # setting up image
-        image_settings = ImageSettings(
+        image_settings = ImageConfig(
             name=self.mano['requirements']['image'],
             image_user='ubuntu',
             exists=True)
         # setting up port
-        port_settings = PortSettings(
+        port_settings = PortConfig(
             name='%s_port' % self.case_name,
             network_name=self.mano['details']['network']['name'])
         # build configuration of vm
-        orchestra_settings = VmInstanceSettings(
+        orchestra_settings = VmInstanceConfig(
             name=self.case_name,
             flavor=self.mano['details']['flavor']['name'],
             port_settings=[port_settings],
             security_group_names=[self.mano['details']['sec_group']],
-            userdata=userdata)
+            userdata=str(userdata))
         orchestra_vm = OpenStackVmInstance(self.snaps_creds,
                                            orchestra_settings,
                                            image_settings)
@@ -495,7 +479,7 @@ class ClearwaterImsVnf(vnf.VnfOnBoarding):
 
         self.logger.info("Waiting for Open Baton NFVO to be up and running...")
         timeout = 0
-        while timeout < 200:
+        while timeout < 20:
             if servertest(
                     self.mano['details']['fip'].ip,
                     "8080"):
@@ -503,11 +487,11 @@ class ClearwaterImsVnf(vnf.VnfOnBoarding):
             else:
                 self.logger.info(
                     "Open Baton NFVO is not started yet (%ss)",
-                    (timeout * 5))
-                time.sleep(5)
+                    (timeout * 60))
+                time.sleep(60)
                 timeout += 1
 
-        if timeout >= 200:
+        if timeout >= 20:
             duration = time.time() - start_time
             self.details["orchestrator"].update(
                 status='FAIL', duration=duration)
@@ -535,7 +519,7 @@ class ClearwaterImsVnf(vnf.VnfOnBoarding):
 
         self.logger.info(
             "Create %s Flavor if not existing", self.vnf['name'])
-        flavor_settings = FlavorSettings(
+        flavor_settings = FlavorConfig(
             name=self.vnf['requirements']['flavor']['name'],
             ram=self.vnf['requirements']['flavor']['ram_min'],
             disk=self.vnf['requirements']['flavor']['disk'],
@@ -600,13 +584,13 @@ class ClearwaterImsVnf(vnf.VnfOnBoarding):
         while self.mano['details']['nsr'].get("status") != 'ACTIVE' \
                 and self.mano['details']['nsr'].get("status") != 'ERROR':
             timeout += 1
-            self.logger.info("NSR is not yet ACTIVE... (%ss)", 5 * timeout)
-            if timeout == 300:
-                self.logger.error("INACTIVE NSR after %s sec..", 5 * timeout)
+            self.logger.info("NSR is not yet ACTIVE... (%ss)", 60 * timeout)
+            if timeout == 30:
+                self.logger.error("INACTIVE NSR after %s sec..", 60 * timeout)
                 duration = time.time() - start_time
                 self.details["vnf"].update(status='FAIL', duration=duration)
                 return False
-            time.sleep(5)
+            time.sleep(60)
             self.mano['details']['nsr'] = json.loads(
                 nsr_agent.find(self.mano['details']['nsr'].get('id')))
 
@@ -660,24 +644,26 @@ class ClearwaterImsVnf(vnf.VnfOnBoarding):
 
         try:
             neutron_client = os_utils.get_neutron_client(self.creds)
+            keystone_client = os_utils.get_keystone_client(self.creds)
             self.logger.info("Deleting Open Baton Port...")
-            port = snaps_utils.neutron_utils.get_port_by_name(
-                neutron_client, '%s_port' % self.case_name)
+            port = snaps_utils.neutron_utils.get_port(
+                neutron_client, keystone_client,
+                port_name='%s_port' % self.case_name)
             snaps_utils.neutron_utils.delete_port(neutron_client, port)
             time.sleep(10)
-        except Exception as exc:
+        except Exception as exc:  # pylint: disable=broad-except
             self.logger.error('Unexpected error cleaning - %s', exc)
         try:
             self.logger.info("Deleting Open Baton Floating IP...")
             snaps_utils.neutron_utils.delete_floating_ip(
                 neutron_client, self.mano['details']['fip'])
-        except Exception as exc:
+        except Exception as exc:  # pylint: disable=broad-except
             self.logger.error('Unexpected error cleaning - %s', exc)
 
         for resource in reversed(self.created_resources):
             try:
                 self.logger.info("Cleaning %s", str(resource))
                 resource.clean()
-            except Exception as exc:
+            except Exception as exc:  # pylint: disable=broad-except
                 self.logger.error('Unexpected error cleaning - %s', exc)
         super(ClearwaterImsVnf, self).clean()

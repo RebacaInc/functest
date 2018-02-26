@@ -7,7 +7,10 @@
 # which accompanies this distribution, and is available at
 # http://www.apache.org/licenses/LICENSE-2.0
 
+# pylint: disable=missing-docstring
+
 import logging
+import os
 import unittest
 
 import mock
@@ -17,6 +20,7 @@ with mock.patch('functest.cli.commands.cli_testcase.CliTestcase.__init__',
                 mock.Mock(return_value=None)), \
     mock.patch('functest.cli.commands.cli_tier.CliTier.__init__',
                mock.Mock(return_value=None)):
+    os.environ['OS_AUTH_URL'] = ''
     from functest.cli import cli_base
 
 
@@ -24,34 +28,14 @@ class CliBaseTesting(unittest.TestCase):
 
     def setUp(self):
         self.runner = CliRunner()
-        self._openstack = cli_base._openstack
-        self._env = cli_base._env
-        self._testcase = cli_base._testcase
-        self._tier = cli_base._tier
+        self._openstack = cli_base.OPENSTACK
+        self._env = cli_base.ENV
+        self._testcase = cli_base.TESTCASE
+        self._tier = cli_base.TIER
 
     def test_os_check(self):
         with mock.patch.object(self._openstack, 'check') as mock_method:
             result = self.runner.invoke(cli_base.os_check)
-            self.assertEqual(result.exit_code, 0)
-            self.assertTrue(mock_method.called)
-
-    def test_os_snapshot_create(self):
-        with mock.patch.object(self._openstack, 'snapshot_create') \
-                as mock_method:
-            result = self.runner.invoke(cli_base.os_snapshot_create)
-            self.assertEqual(result.exit_code, 0)
-            self.assertTrue(mock_method.called)
-
-    def test_os_snapshot_show(self):
-        with mock.patch.object(self._openstack, 'snapshot_show') \
-                as mock_method:
-            result = self.runner.invoke(cli_base.os_snapshot_show)
-            self.assertEqual(result.exit_code, 0)
-            self.assertTrue(mock_method.called)
-
-    def test_os_clean(self):
-        with mock.patch.object(self._openstack, 'clean') as mock_method:
-            result = self.runner.invoke(cli_base.os_clean)
             self.assertEqual(result.exit_code, 0)
             self.assertTrue(mock_method.called)
 
@@ -62,21 +46,9 @@ class CliBaseTesting(unittest.TestCase):
             self.assertEqual(result.exit_code, 0)
             self.assertTrue(mock_method.called)
 
-    def test_env_prepare(self):
-        with mock.patch.object(self._env, 'prepare') as mock_method:
-            result = self.runner.invoke(cli_base.env_prepare)
-            self.assertEqual(result.exit_code, 0)
-            self.assertTrue(mock_method.called)
-
     def test_env_show(self):
         with mock.patch.object(self._env, 'show') as mock_method:
             result = self.runner.invoke(cli_base.env_show)
-            self.assertEqual(result.exit_code, 0)
-            self.assertTrue(mock_method.called)
-
-    def test_env_status(self):
-        with mock.patch.object(self._env, 'status') as mock_method:
-            result = self.runner.invoke(cli_base.env_status)
             self.assertEqual(result.exit_code, 0)
             self.assertTrue(mock_method.called)
 

@@ -6,15 +6,17 @@
 #
 # http://www.apache.org/licenses/LICENSE-2.0
 
-import mock
-import os
+# pylint: disable=missing-docstring
+
+import logging
 import unittest
 
+import mock
 from snaps.openstack.os_credentials import OSCreds
 
 from functest.core.testcase import TestCase
-from functest.opnfv_tests.openstack.snaps import (connection_check, api_check,
-                                                  health_check, smoke)
+from functest.opnfv_tests.openstack.snaps import (
+    connection_check, api_check, health_check, smoke)
 
 
 class ConnectionCheckTesting(unittest.TestCase):
@@ -31,39 +33,54 @@ class ConnectionCheckTesting(unittest.TestCase):
         self.connection_check = connection_check.ConnectionCheck(
             os_creds=self.os_creds, ext_net_name='foo')
 
-    @mock.patch('snaps.test_suite_builder.add_openstack_client_tests')
-    def test_run_success(self, add_os_client_tests):
-        result = mock.MagicMock(name='unittest.TextTestResult')
-        result.testsRun = 100
-        result.failures = []
-        result.errors = []
-        with mock.patch('unittest.TextTestRunner.run', return_value=result):
-            self.assertEquals(TestCase.EX_OK, self.connection_check.run())
-            self.assertEquals(TestCase.EX_OK,
-                              self.connection_check.is_successful())
+    @mock.patch('functest.opnfv_tests.openstack.snaps.snaps_suite_builder.'
+                'add_openstack_client_tests')
+    @mock.patch('unittest.TextTestRunner.run',
+                return_value=mock.MagicMock(name='unittest.TextTestResult'))
+    def test_run_success(self, *args):
+        args[0].return_value.testsRun = 100
+        args[0].return_value.failures = []
+        args[0].return_value.errors = []
+        self.assertEquals(TestCase.EX_OK, self.connection_check.run())
+        self.assertEquals(
+            TestCase.EX_OK, self.connection_check.is_successful())
+        args[0].assert_called_with(mock.ANY)
+        args[1].assert_called_with(
+            ext_net_name='foo', os_creds=self.os_creds, suite=mock.ANY,
+            use_keystone=True)
 
-    @mock.patch('snaps.test_suite_builder.add_openstack_client_tests')
-    def test_run_1_of_100_failures(self, add_os_client_tests):
-        result = mock.MagicMock(name='unittest.TextTestResult')
-        result.testsRun = 100
-        result.failures = ['foo']
-        result.errors = []
-        with mock.patch('unittest.TextTestRunner.run', return_value=result):
-            self.assertEquals(TestCase.EX_OK, self.connection_check.run())
-            self.assertEquals(TestCase.EX_TESTCASE_FAILED,
-                              self.connection_check.is_successful())
+    @mock.patch('functest.opnfv_tests.openstack.snaps.snaps_suite_builder.'
+                'add_openstack_client_tests')
+    @mock.patch('unittest.TextTestRunner.run',
+                return_value=mock.MagicMock(name='unittest.TextTestResult'))
+    def test_run_1_of_100_ko(self, *args):
+        args[0].return_value.testsRun = 100
+        args[0].return_value.failures = ['foo']
+        args[0].return_value.errors = []
+        self.assertEquals(TestCase.EX_OK, self.connection_check.run())
+        self.assertEquals(
+            TestCase.EX_TESTCASE_FAILED, self.connection_check.is_successful())
+        args[0].assert_called_with(mock.ANY)
+        args[1].assert_called_with(
+            ext_net_name='foo', os_creds=self.os_creds, suite=mock.ANY,
+            use_keystone=True)
 
-    @mock.patch('snaps.test_suite_builder.add_openstack_client_tests')
-    def test_run_1_of_100_failures_within_criteria(self, add_os_client_tests):
+    @mock.patch('functest.opnfv_tests.openstack.snaps.snaps_suite_builder.'
+                'add_openstack_client_tests')
+    @mock.patch('unittest.TextTestRunner.run',
+                return_value=mock.MagicMock(name='unittest.TextTestResult'))
+    def test_run_1_of_100_ko_criteria(self, *args):
         self.connection_check.criteria = 90
-        result = mock.MagicMock(name='unittest.TextTestResult')
-        result.testsRun = 100
-        result.failures = ['foo']
-        result.errors = []
-        with mock.patch('unittest.TextTestRunner.run', return_value=result):
-            self.assertEquals(TestCase.EX_OK, self.connection_check.run())
-            self.assertEquals(TestCase.EX_OK,
-                              self.connection_check.is_successful())
+        args[0].return_value.testsRun = 100
+        args[0].return_value.failures = ['foo']
+        args[0].return_value.errors = []
+        self.assertEquals(TestCase.EX_OK, self.connection_check.run())
+        self.assertEquals(
+            TestCase.EX_OK, self.connection_check.is_successful())
+        args[0].assert_called_with(mock.ANY)
+        args[1].assert_called_with(
+            ext_net_name='foo', os_creds=self.os_creds, suite=mock.ANY,
+            use_keystone=True)
 
 
 class APICheckTesting(unittest.TestCase):
@@ -80,39 +97,54 @@ class APICheckTesting(unittest.TestCase):
         self.api_check = api_check.ApiCheck(
             os_creds=self.os_creds, ext_net_name='foo')
 
-    @mock.patch('snaps.test_suite_builder.add_openstack_api_tests')
-    def test_run_success(self, add_tests):
-        result = mock.MagicMock(name='unittest.TextTestResult')
-        result.testsRun = 100
-        result.failures = []
-        result.errors = []
-        with mock.patch('unittest.TextTestRunner.run', return_value=result):
-            self.assertEquals(TestCase.EX_OK, self.api_check.run())
-            self.assertEquals(TestCase.EX_OK,
-                              self.api_check.is_successful())
+    @mock.patch('functest.opnfv_tests.openstack.snaps.snaps_suite_builder.'
+                'add_openstack_api_tests')
+    @mock.patch('unittest.TextTestRunner.run',
+                return_value=mock.MagicMock(name='unittest.TextTestResult'))
+    def test_run_success(self, *args):
+        args[0].return_value.testsRun = 100
+        args[0].return_value.failures = []
+        args[0].return_value.errors = []
+        self.assertEquals(TestCase.EX_OK, self.api_check.run())
+        self.assertEquals(
+            TestCase.EX_OK, self.api_check.is_successful())
+        args[0].assert_called_with(mock.ANY)
+        args[1].assert_called_with(
+            ext_net_name='foo', image_metadata=mock.ANY,
+            os_creds=self.os_creds, suite=mock.ANY, use_keystone=True)
 
-    @mock.patch('snaps.test_suite_builder.add_openstack_api_tests')
-    def test_run_1_of_100_failures(self, add_tests):
-        result = mock.MagicMock(name='unittest.TextTestResult')
-        result.testsRun = 100
-        result.failures = ['foo']
-        result.errors = []
-        with mock.patch('unittest.TextTestRunner.run', return_value=result):
-            self.assertEquals(TestCase.EX_OK, self.api_check.run())
-            self.assertEquals(TestCase.EX_TESTCASE_FAILED,
-                              self.api_check.is_successful())
+    @mock.patch('functest.opnfv_tests.openstack.snaps.snaps_suite_builder.'
+                'add_openstack_api_tests')
+    @mock.patch('unittest.TextTestRunner.run',
+                return_value=mock.MagicMock(name='unittest.TextTestResult'))
+    def test_run_1_of_100_ko(self, *args):
+        args[0].return_value.testsRun = 100
+        args[0].return_value.failures = ['foo']
+        args[0].return_value.errors = []
+        self.assertEquals(TestCase.EX_OK, self.api_check.run())
+        self.assertEquals(
+            TestCase.EX_TESTCASE_FAILED, self.api_check.is_successful())
+        args[0].assert_called_with(mock.ANY)
+        args[1].assert_called_with(
+            ext_net_name='foo', image_metadata=mock.ANY,
+            os_creds=self.os_creds, suite=mock.ANY, use_keystone=True)
 
-    @mock.patch('snaps.test_suite_builder.add_openstack_api_tests')
-    def test_run_1_of_100_failures_within_criteria(self, add_tests):
+    @mock.patch('functest.opnfv_tests.openstack.snaps.snaps_suite_builder.'
+                'add_openstack_api_tests')
+    @mock.patch('unittest.TextTestRunner.run',
+                return_value=mock.MagicMock(name='unittest.TextTestResult'))
+    def test_run_1_of_100_ko_criteria(self, *args):
         self.api_check.criteria = 90
-        result = mock.MagicMock(name='unittest.TextTestResult')
-        result.testsRun = 100
-        result.failures = ['foo']
-        result.errors = []
-        with mock.patch('unittest.TextTestRunner.run', return_value=result):
-            self.assertEquals(TestCase.EX_OK, self.api_check.run())
-            self.assertEquals(TestCase.EX_OK,
-                              self.api_check.is_successful())
+        args[0].return_value.testsRun = 100
+        args[0].return_value.failures = ['foo']
+        args[0].return_value.errors = []
+        self.assertEquals(TestCase.EX_OK, self.api_check.run())
+        self.assertEquals(
+            TestCase.EX_OK, self.api_check.is_successful())
+        args[0].assert_called_with(mock.ANY)
+        args[1].assert_called_with(
+            ext_net_name='foo', image_metadata=mock.ANY,
+            os_creds=self.os_creds, suite=mock.ANY, use_keystone=True)
 
 
 class HealthCheckTesting(unittest.TestCase):
@@ -129,39 +161,57 @@ class HealthCheckTesting(unittest.TestCase):
         self.health_check = health_check.HealthCheck(
             os_creds=self.os_creds, ext_net_name='foo')
 
-    @mock.patch('snaps.test_suite_builder.add_openstack_client_tests')
-    def test_run_success(self, add_tests):
-        result = mock.MagicMock(name='unittest.TextTestResult')
-        result.testsRun = 100
-        result.failures = []
-        result.errors = []
-        with mock.patch('unittest.TextTestRunner.run', return_value=result):
-            self.assertEquals(TestCase.EX_OK, self.health_check.run())
-            self.assertEquals(TestCase.EX_OK,
-                              self.health_check.is_successful())
+    @mock.patch('snaps.openstack.tests.os_source_file_test.'
+                'OSIntegrationTestCase.parameterize')
+    @mock.patch('unittest.TextTestRunner.run',
+                return_value=mock.MagicMock(name='unittest.TextTestResult'))
+    def test_run_success(self, *args):
+        args[0].return_value.testsRun = 100
+        args[0].return_value.failures = []
+        args[0].return_value.errors = []
+        self.assertEquals(TestCase.EX_OK, self.health_check.run())
+        self.assertEquals(
+            TestCase.EX_OK, self.health_check.is_successful())
+        args[0].assert_called_with(mock.ANY)
+        args[1].assert_called_with(
+            mock.ANY, ext_net_name='foo', flavor_metadata=None,
+            image_metadata=mock.ANY, netconf_override=None,
+            os_creds=self.os_creds, use_keystone=True)
 
-    @mock.patch('snaps.test_suite_builder.add_openstack_client_tests')
-    def test_run_1_of_100_failures(self, add_tests):
-        result = mock.MagicMock(name='unittest.TextTestResult')
-        result.testsRun = 100
-        result.failures = ['foo']
-        result.errors = []
-        with mock.patch('unittest.TextTestRunner.run', return_value=result):
-            self.assertEquals(TestCase.EX_OK, self.health_check.run())
-            self.assertEquals(TestCase.EX_TESTCASE_FAILED,
-                              self.health_check.is_successful())
+    @mock.patch('snaps.openstack.tests.os_source_file_test.'
+                'OSIntegrationTestCase.parameterize')
+    @mock.patch('unittest.TextTestRunner.run',
+                return_value=mock.MagicMock(name='unittest.TextTestResult'))
+    def test_run_1_of_100_ko(self, *args):
+        args[0].return_value.testsRun = 100
+        args[0].return_value.failures = ['foo']
+        args[0].return_value.errors = []
+        self.assertEquals(TestCase.EX_OK, self.health_check.run())
+        self.assertEquals(
+            TestCase.EX_TESTCASE_FAILED, self.health_check.is_successful())
+        args[0].assert_called_with(mock.ANY)
+        args[1].assert_called_with(
+            mock.ANY, ext_net_name='foo', flavor_metadata=None,
+            image_metadata=mock.ANY, netconf_override=None,
+            os_creds=self.os_creds, use_keystone=True)
 
-    @mock.patch('snaps.test_suite_builder.add_openstack_client_tests')
-    def test_run_1_of_100_failures_within_criteria(self, add_tests):
+    @mock.patch('snaps.openstack.tests.os_source_file_test.'
+                'OSIntegrationTestCase.parameterize')
+    @mock.patch('unittest.TextTestRunner.run',
+                return_value=mock.MagicMock(name='unittest.TextTestResult'))
+    def test_run_1_of_100_ko_criteria(self, *args):
         self.health_check.criteria = 90
-        result = mock.MagicMock(name='unittest.TextTestResult')
-        result.testsRun = 100
-        result.failures = ['foo']
-        result.errors = []
-        with mock.patch('unittest.TextTestRunner.run', return_value=result):
-            self.assertEquals(TestCase.EX_OK, self.health_check.run())
-            self.assertEquals(TestCase.EX_OK,
-                              self.health_check.is_successful())
+        args[0].return_value.testsRun = 100
+        args[0].return_value.failures = ['foo']
+        args[0].return_value.errors = []
+        self.assertEquals(TestCase.EX_OK, self.health_check.run())
+        self.assertEquals(
+            TestCase.EX_OK, self.health_check.is_successful())
+        args[0].assert_called_with(mock.ANY)
+        args[1].assert_called_with(
+            mock.ANY, ext_net_name='foo', flavor_metadata=None,
+            image_metadata=mock.ANY, netconf_override=None,
+            os_creds=self.os_creds, use_keystone=True)
 
 
 class SmokeTesting(unittest.TestCase):
@@ -178,39 +228,58 @@ class SmokeTesting(unittest.TestCase):
         self.smoke = smoke.SnapsSmoke(
             os_creds=self.os_creds, ext_net_name='foo')
 
-    @mock.patch('snaps.test_suite_builder.add_openstack_integration_tests')
-    @mock.patch('os.path.join', return_value=os.getcwd())
-    def test_run_success(self, add_tests, cwd):
-        result = mock.MagicMock(name='unittest.TextTestResult')
-        result.testsRun = 100
-        result.failures = []
-        result.errors = []
-        with mock.patch('unittest.TextTestRunner.run', return_value=result):
-            self.assertEquals(TestCase.EX_OK, self.smoke.run())
-            self.assertEquals(TestCase.EX_OK,
-                              self.smoke.is_successful())
+    @mock.patch('functest.opnfv_tests.openstack.snaps.snaps_suite_builder.'
+                'add_openstack_integration_tests')
+    @mock.patch('unittest.TextTestRunner.run',
+                return_value=mock.MagicMock(name='unittest.TextTestResult'))
+    def test_run_success(self, *args):
+        args[0].return_value.testsRun = 100
+        args[0].return_value.failures = []
+        args[0].return_value.errors = []
+        self.assertEquals(TestCase.EX_OK, self.smoke.run())
+        self.assertEquals(TestCase.EX_OK, self.smoke.is_successful())
+        args[0].assert_called_with(mock.ANY)
+        args[1].assert_called_with(
+            ext_net_name='foo', flavor_metadata=None, image_metadata=mock.ANY,
+            netconf_override=None, os_creds=self.os_creds,
+            suite=mock.ANY, use_floating_ips=True, use_keystone=True)
 
-    @mock.patch('snaps.test_suite_builder.add_openstack_integration_tests')
-    @mock.patch('os.path.join', return_value=os.getcwd())
-    def test_run_1_of_100_failures(self, add_tests, cwd):
-        result = mock.MagicMock(name='unittest.TextTestResult')
-        result.testsRun = 100
-        result.failures = ['foo']
-        result.errors = []
-        with mock.patch('unittest.TextTestRunner.run', return_value=result):
-            self.assertEquals(TestCase.EX_OK, self.smoke.run())
-            self.assertEquals(TestCase.EX_TESTCASE_FAILED,
-                              self.smoke.is_successful())
+    @mock.patch('functest.opnfv_tests.openstack.snaps.snaps_suite_builder.'
+                'add_openstack_integration_tests')
+    @mock.patch('unittest.TextTestRunner.run',
+                return_value=mock.MagicMock(name='unittest.TextTestResult'))
+    def test_run_1_of_100_ko(self, *args):
+        args[0].return_value.testsRun = 100
+        args[0].return_value.failures = ['foo']
+        args[0].return_value.errors = []
+        self.assertEquals(TestCase.EX_OK, self.smoke.run())
+        self.assertEquals(
+            TestCase.EX_TESTCASE_FAILED, self.smoke.is_successful())
+        args[0].assert_called_with(mock.ANY)
+        args[1].assert_called_with(
+            ext_net_name='foo', flavor_metadata=None, image_metadata=mock.ANY,
+            netconf_override=mock.ANY, os_creds=self.os_creds,
+            suite=mock.ANY, use_floating_ips=True, use_keystone=True)
 
-    @mock.patch('snaps.test_suite_builder.add_openstack_integration_tests')
-    @mock.patch('os.path.join', return_value=os.getcwd())
-    def test_run_1_of_100_failures_within_criteria(self, add_tests, cwd):
+    @mock.patch('functest.opnfv_tests.openstack.snaps.snaps_suite_builder.'
+                'add_openstack_integration_tests')
+    @mock.patch('unittest.TextTestRunner.run',
+                return_value=mock.MagicMock(name='unittest.TextTestResult'))
+    def test_run_1_of_100_ko_criteria(self, *args):
         self.smoke.criteria = 90
-        result = mock.MagicMock(name='unittest.TextTestResult')
-        result.testsRun = 100
-        result.failures = ['foo']
-        result.errors = []
-        with mock.patch('unittest.TextTestRunner.run', return_value=result):
-            self.assertEquals(TestCase.EX_OK, self.smoke.run())
-            self.assertEquals(TestCase.EX_OK,
-                              self.smoke.is_successful())
+        args[0].return_value.testsRun = 100
+        args[0].return_value.failures = ['foo']
+        args[0].return_value.errors = []
+        self.assertEquals(TestCase.EX_OK, self.smoke.run())
+        self.assertEquals(
+            TestCase.EX_OK, self.smoke.is_successful())
+        args[0].assert_called_with(mock.ANY)
+        args[1].assert_called_with(
+            ext_net_name='foo', flavor_metadata=None, image_metadata=mock.ANY,
+            netconf_override=None, os_creds=self.os_creds,
+            suite=mock.ANY, use_floating_ips=True, use_keystone=True)
+
+
+if __name__ == "__main__":
+    logging.disable(logging.CRITICAL)
+    unittest.main(verbosity=2)

@@ -19,102 +19,62 @@ Example:
 from __future__ import division
 
 import argparse
-import errno
 import fileinput
 import logging
 import os
 import re
 import sys
 
-import robot.api
-from robot.errors import RobotError
-import robot.run
-from robot.utils.robottime import timestamp_to_secs
-from six import StringIO
 from six.moves import urllib
+from snaps.openstack.utils import keystone_utils
 
-from functest.core import testcase
-from functest.utils import constants
-import functest.utils.openstack_utils as op_utils
+from functest.core import robotframework
+from functest.opnfv_tests.openstack.snaps import snaps_utils
+from functest.utils import config
+from functest.utils import env
 
 __author__ = "Cedric Ollivier <cedric.ollivier@orange.com>"
 
 
-class ODLResultVisitor(robot.api.ResultVisitor):
-    """Visitor to get result details."""
-
-    def __init__(self):
-        self._data = []
-
-    def visit_test(self, test):
-        output = {}
-        output['name'] = test.name
-        output['parent'] = test.parent.name
-        output['status'] = test.status
-        output['starttime'] = test.starttime
-        output['endtime'] = test.endtime
-        output['critical'] = test.critical
-        output['text'] = test.message
-        output['elapsedtime'] = test.elapsedtime
-        self._data.append(output)
-
-    def get_data(self):
-        """Get the details of the result."""
-        return self._data
-
-
-class ODLTests(testcase.TestCase):
+class ODLTests(robotframework.RobotFramework):
     """ODL test runner."""
 
-    odl_test_repo = constants.CONST.__getattribute__('dir_repo_odl_test')
-    neutron_suite_dir = os.path.join(odl_test_repo,
-                                     "csit/suites/openstack/neutron")
-    basic_suite_dir = os.path.join(odl_test_repo,
-                                   "csit/suites/integration/basic")
+    odl_test_repo = getattr(config.CONF, 'dir_repo_odl_test')
+    neutron_suite_dir = os.path.join(
+        odl_test_repo, "csit/suites/openstack/neutron")
+    basic_suite_dir = os.path.join(
+        odl_test_repo, "csit/suites/integration/basic")
     default_suites = [basic_suite_dir, neutron_suite_dir]
-    res_dir = os.path.join(
-        constants.CONST.__getattribute__('dir_results'), 'odl')
+    odl_variables_file = os.path.join(
+        odl_test_repo, 'csit/variables/Variables.robot')
     __logger = logging.getLogger(__name__)
+
+    def __init__(self, **kwargs):
+        super(ODLTests, self).__init__(**kwargs)
+        self.res_dir = os.path.join(
+            getattr(config.CONF, 'dir_results'), 'odl')
+        self.xml_file = os.path.join(self.res_dir, 'output.xml')
 
     @classmethod
     def set_robotframework_vars(cls, odlusername="admin", odlpassword="admin"):
-        """Set credentials in csit/variables/Variables.py.
+        """Set credentials in csit/variables/Variables.robot.
 
         Returns:
             True if credentials are set.
             False otherwise.
         """
-        odl_variables_files = os.path.join(cls.odl_test_repo,
-                                           'csit/variables/Variables.py')
+
         try:
-            for line in fileinput.input(odl_variables_files,
+            for line in fileinput.input(cls.odl_variables_file,
                                         inplace=True):
-                print(re.sub("AUTH = .*",
-                             ("AUTH = [u'" + odlusername + "', u'" +
-                              odlpassword + "']"),
+                print(re.sub("@{AUTH}.*",
+                             "@{{AUTH}}           {}    {}".format(
+                                 odlusername, odlpassword),
                              line.rstrip()))
             return True
-        except Exception as ex:  # pylint: disable=broad-except
-            cls.__logger.error("Cannot set ODL creds: %s", str(ex))
+        except Exception:  # pylint: disable=broad-except
+            cls.__logger.exception("Cannot set ODL creds:")
             return False
-
-    def parse_results(self):
-        """Parse output.xml and get the details in it."""
-        xml_file = os.path.join(self.res_dir, 'output.xml')
-        result = robot.api.ExecutionResult(xml_file)
-        visitor = ODLResultVisitor()
-        result.visit(visitor)
-        try:
-            self.result = 100 * (
-                result.suite.statistics.critical.passed /
-                result.suite.statistics.critical.total)
-        except ZeroDivisionError:
-            self.__logger.error("No test has been run")
-        self.start_time = timestamp_to_secs(result.suite.starttime)
-        self.stop_time = timestamp_to_secs(result.suite.endtime)
-        self.details = {}
-        self.details['description'] = result.suite.name
-        self.details['tests'] = visitor.get_data()
 
     def run_suites(self, suites=None, **kwargs):
         """Run the test suites
@@ -125,9 +85,9 @@ class ODLTests(testcase.TestCase):
            * odlusername,
            * odlpassword,
            * osauthurl,
-           * neutronip,
+           * neutronurl,
            * osusername,
-           * ostenantname,
+           * osprojectname,
            * ospassword,
            * odlip,
            * odlwebport,
@@ -152,49 +112,36 @@ class ODLTests(testcase.TestCase):
             odlusername = kwargs['odlusername']
             odlpassword = kwargs['odlpassword']
             osauthurl = kwargs['osauthurl']
-            keystoneip = urllib.parse.urlparse(osauthurl).hostname
-            variables = ['KEYSTONE:' + keystoneip,
-                         'NEUTRON:' + kwargs['neutronip'],
-                         'OS_AUTH_URL:"' + osauthurl + '"',
-                         'OSUSERNAME:"' + kwargs['osusername'] + '"',
-                         'OSTENANTNAME:"' + kwargs['ostenantname'] + '"',
-                         'OSPASSWORD:"' + kwargs['ospassword'] + '"',
-                         'ODL_SYSTEM_IP:' + kwargs['odlip'],
-                         'PORT:' + kwargs['odlwebport'],
-                         'RESTCONFPORT:' + kwargs['odlrestconfport']]
-        except KeyError as ex:
-            self.__logger.error("Cannot run ODL testcases. Please check "
-                                "%s", str(ex))
+            keystoneurl = "{}://{}".format(
+                urllib.parse.urlparse(osauthurl).scheme,
+                urllib.parse.urlparse(osauthurl).netloc)
+            variable = ['KEYSTONEURL:' + keystoneurl,
+                        'NEUTRONURL:' + kwargs['neutronurl'],
+                        'OS_AUTH_URL:"' + osauthurl + '"',
+                        'OSUSERNAME:"' + kwargs['osusername'] + '"',
+                        ('OSUSERDOMAINNAME:"' +
+                         kwargs['osuserdomainname'] + '"'),
+                        'OSTENANTNAME:"' + kwargs['osprojectname'] + '"',
+                        ('OSPROJECTDOMAINNAME:"' +
+                         kwargs['osprojectdomainname'] + '"'),
+                        'OSPASSWORD:"' + kwargs['ospassword'] + '"',
+                        'ODL_SYSTEM_IP:' + kwargs['odlip'],
+                        'PORT:' + kwargs['odlwebport'],
+                        'RESTCONFPORT:' + kwargs['odlrestconfport']]
+        except KeyError:
+            self.__logger.exception("Cannot run ODL testcases. Please check")
             return self.EX_RUN_ERROR
-        if self.set_robotframework_vars(odlusername, odlpassword):
-            try:
-                os.makedirs(self.res_dir)
-            except OSError as ex:
-                if ex.errno != errno.EEXIST:
-                    self.__logger.exception(
-                        "Cannot create %s", self.res_dir)
-                    return self.EX_RUN_ERROR
-            output_dir = os.path.join(self.res_dir, 'output.xml')
-            stream = StringIO()
-            robot.run(*suites, variable=variables, output=output_dir,
-                      log='NONE', report='NONE', stdout=stream)
-            self.__logger.info("\n" + stream.getvalue())
-            self.__logger.info("ODL results were successfully generated")
-            try:
-                self.parse_results()
-                self.__logger.info("ODL results were successfully parsed")
-            except RobotError as ex:
-                self.__logger.error("Run tests before publishing: %s",
-                                    ex.message)
-                return self.EX_RUN_ERROR
-            return self.EX_OK
+        if not os.path.isfile(self.odl_variables_file):
+            self.__logger.info("Skip writting ODL creds")
         else:
-            return self.EX_RUN_ERROR
+            if not self.set_robotframework_vars(odlusername, odlpassword):
+                return self.EX_RUN_ERROR
+        return super(ODLTests, self).run(variable=variable, suites=suites)
 
     def run(self, **kwargs):
         """Run suites in OPNFV environment
 
-        It basically check env vars to call main() with the keywords
+        It basically checks env vars to call main() with the keywords
         required.
 
         Args:
@@ -210,36 +157,39 @@ class ODLTests(testcase.TestCase):
                 suites = kwargs["suites"]
             except KeyError:
                 pass
-            neutron_url = op_utils.get_endpoint(service_type='network')
-            kwargs = {'neutronip': urllib.parse.urlparse(neutron_url).hostname}
-            kwargs['odlip'] = kwargs['neutronip']
+            snaps_creds = snaps_utils.get_credentials()
+            kwargs = {'neutronurl': keystone_utils.get_endpoint(
+                snaps_creds, 'network')}
+            kwargs['odlip'] = urllib.parse.urlparse(
+                kwargs['neutronurl']).hostname
             kwargs['odlwebport'] = '8080'
             kwargs['odlrestconfport'] = '8181'
             kwargs['odlusername'] = 'admin'
             kwargs['odlpassword'] = 'admin'
-            installer_type = None
-            if 'INSTALLER_TYPE' in os.environ:
-                installer_type = os.environ['INSTALLER_TYPE']
+            installer_type = env.get('INSTALLER_TYPE')
             kwargs['osusername'] = os.environ['OS_USERNAME']
-            kwargs['ostenantname'] = os.environ['OS_TENANT_NAME']
+            kwargs['osuserdomainname'] = os.environ.get(
+                'OS_USER_DOMAIN_NAME', 'Default')
+            kwargs['osprojectname'] = os.environ['OS_PROJECT_NAME']
+            kwargs['osprojectdomainname'] = os.environ.get(
+                'OS_PROJECT_DOMAIN_NAME', 'Default')
             kwargs['osauthurl'] = os.environ['OS_AUTH_URL']
             kwargs['ospassword'] = os.environ['OS_PASSWORD']
             if installer_type == 'fuel':
-                kwargs['odlwebport'] = '8282'
+                kwargs['odlwebport'] = '8181'
+                kwargs['odlrestconfport'] = '8282'
             elif installer_type == 'apex' or installer_type == 'netvirt':
-                kwargs['odlip'] = os.environ['SDN_CONTROLLER_IP']
+                kwargs['odlip'] = env.get('SDN_CONTROLLER_IP')
                 kwargs['odlwebport'] = '8081'
                 kwargs['odlrestconfport'] = '8081'
-            elif installer_type == 'joid':
-                kwargs['odlip'] = os.environ['SDN_CONTROLLER']
             elif installer_type == 'compass':
                 kwargs['odlrestconfport'] = '8080'
             elif installer_type == 'daisy':
-                kwargs['odlip'] = os.environ['SDN_CONTROLLER_IP']
+                kwargs['odlip'] = env.get('SDN_CONTROLLER_IP')
                 kwargs['odlwebport'] = '8181'
                 kwargs['odlrestconfport'] = '8087'
             else:
-                kwargs['odlip'] = os.environ['SDN_CONTROLLER_IP']
+                kwargs['odlip'] = env.get('SDN_CONTROLLER_IP')
         except KeyError as ex:
             self.__logger.error("Cannot run ODL testcases. "
                                 "Please check env var: "
@@ -258,17 +208,24 @@ class ODLParser(object):  # pylint: disable=too-few-public-methods
     def __init__(self):
         self.parser = argparse.ArgumentParser()
         self.parser.add_argument(
-            '-n', '--neutronip', help='Neutron IP',
-            default='127.0.0.1')
+            '-n', '--neutronurl', help='Neutron Endpoint',
+            default='http://127.0.0.1:9696')
         self.parser.add_argument(
             '-k', '--osauthurl', help='OS_AUTH_URL as defined by OpenStack',
-            default='http://127.0.0.1:5000/v2.0')
+            default='http://127.0.0.1:5000/v3')
         self.parser.add_argument(
             '-a', '--osusername', help='Username for OpenStack',
             default='admin')
         self.parser.add_argument(
-            '-b', '--ostenantname', help='Tenantname for OpenStack',
+            '-f', '--osuserdomainname', help='User domain name for OpenStack',
+            default='Default')
+        self.parser.add_argument(
+            '-b', '--osprojectname', help='Projet name for OpenStack',
             default='admin')
+        self.parser.add_argument(
+            '-g', '--osprojectdomainname',
+            help='Project domain name for OpenStack',
+            default='Default')
         self.parser.add_argument(
             '-c', '--ospassword', help='Password for OpenStack',
             default='admin')
@@ -312,11 +269,10 @@ def main():
     args = parser.parse_args(sys.argv[1:])
     try:
         result = odl.run_suites(ODLTests.default_suites, **args)
-        if result != testcase.TestCase.EX_OK:
+        if result != robotframework.RobotFramework.EX_OK:
             return result
         if args['pushtodb']:
             return odl.push_to_db()
-        else:
-            return result
+        return result
     except Exception:  # pylint: disable=broad-except
-        return testcase.TestCase.EX_RUN_ERROR
+        return robotframework.RobotFramework.EX_RUN_ERROR

@@ -1,51 +1,44 @@
 #!/usr/bin/env python
 
-import pkg_resources
+# Copyright (c) 2018 Orange and others.
+#
+# All rights reserved. This program and the accompanying materials
+# are made available under the terms of the Apache License, Version 2.0
+# which accompanies this distribution, and is available at
+# http://www.apache.org/licenses/LICENSE-2.0
+
+# pylint: disable=missing-docstring
+
 import os
-import re
 
-import six
+import prettytable
 
-
-default_envs = {
-    'NODE_NAME': 'unknown_pod',
-    'CI_DEBUG': 'false',
+INPUTS = {
+    'EXTERNAL_NETWORK': None,
+    'CI_LOOP': 'daily',
     'DEPLOY_SCENARIO': 'os-nosdn-nofeature-noha',
-    'DEPLOY_TYPE': 'virt',
     'INSTALLER_TYPE': None,
-    'INSTALLER_IP': None,
+    'SDN_CONTROLLER_IP': None,
     'BUILD_TAG': None,
-    'OS_ENDPOINT_TYPE': None,
-    'OS_AUTH_URL': None,
-    'CONFIG_FUNCTEST_YAML': pkg_resources.resource_filename(
-        'functest', 'ci/config_functest.yaml'),
-    'OS_INSECURE': ''
+    'NODE_NAME': None,
+    'POD_ARCH': None,
+    'TEST_DB_URL': 'http://testresults.opnfv.org/test/api/v1/results',
+    'ENERGY_RECORDER_API_URL': 'http://energy.opnfv.fr/resources',
+    'ENERGY_RECORDER_API_USER': None,
+    'ENERGY_RECORDER_API_PASSWORD': None
 }
 
 
-class Environment(object):
-
-    def __init__(self):
-        for k, v in six.iteritems(os.environ):
-            self.__setattr__(k, v)
-        for k, v in six.iteritems(default_envs):
-            if k not in os.environ:
-                self.__setattr__(k, v)
-        self._set_ci_run()
-        if 'CI_LOOP' not in os.environ:
-            self._set_ci_loop()
-
-    def _set_ci_run(self):
-        if self.BUILD_TAG:
-            self.IS_CI_RUN = True
-        else:
-            self.IS_CI_RUN = False
-
-    def _set_ci_loop(self):
-        if self.BUILD_TAG and re.search("daily", self.BUILD_TAG):
-            self.CI_LOOP = "daily"
-        else:
-            self.CI_LOOP = "weekly"
+def get(env_var):
+    if env_var not in INPUTS.keys():
+        return os.environ.get(env_var, None)
+    return os.environ.get(env_var, INPUTS[env_var])
 
 
-ENV = Environment()
+def string():
+    msg = prettytable.PrettyTable(
+        header_style='upper', padding_width=5,
+        field_names=['env var', 'value'])
+    for env_var in INPUTS:
+        msg.add_row([env_var, get(env_var) if get(env_var) else ''])
+    return msg

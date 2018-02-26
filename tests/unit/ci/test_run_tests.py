@@ -5,25 +5,21 @@
 # which accompanies this distribution, and is available at
 # http://www.apache.org/licenses/LICENSE-2.0
 
+# pylint: disable=missing-docstring
+
 import logging
 import unittest
+import os
 
 import mock
 
 from functest.ci import run_tests
-from functest.utils.constants import CONST
 from functest.core.testcase import TestCase
 
 
 class FakeModule(TestCase):
 
-    def run(self):
-        return TestCase.EX_OK
-
-    def push_to_db(self):
-        return TestCase.EX_OK
-
-    def is_successful(self):
+    def run(self, **kwargs):
         return TestCase.EX_OK
 
 
@@ -31,6 +27,10 @@ class RunTestsTesting(unittest.TestCase):
 
     def setUp(self):
         self.runner = run_tests.Runner()
+        mock_test_case = mock.Mock()
+        mock_test_case.is_successful.return_value = TestCase.EX_OK
+        self.runner.executed_test_cases['test1'] = mock_test_case
+        self.runner.executed_test_cases['test2'] = mock_test_case
         self.sep = 'test_sep'
         self.creds = {'OS_AUTH_URL': 'http://test_ip:test_port/v2.0',
                       'OS_USERNAME': 'test_os_username',
@@ -54,80 +54,94 @@ class RunTestsTesting(unittest.TestCase):
 
         self.run_tests_parser = run_tests.RunTestsParser()
 
-    @mock.patch('functest.ci.run_tests.logger.error')
-    def test_source_rc_file_missing_file(self, mock_logger_error):
-        with mock.patch('functest.ci.run_tests.os.path.isfile',
-                        return_value=False), \
-                self.assertRaises(Exception):
-            self.runner.source_rc_file()
+    @mock.patch('functest.ci.run_tests.Runner.get_dict_by_test')
+    def test_get_run_dict(self, *args):
+        retval = {'run': mock.Mock()}
+        args[0].return_value = retval
+        self.assertEqual(self.runner.get_run_dict('test_name'), retval['run'])
+        args[0].assert_called_once_with('test_name')
 
-    @mock.patch('functest.ci.run_tests.logger.debug')
-    @mock.patch('functest.ci.run_tests.os.path.isfile',
-                return_value=True)
-    def test_source_rc_file_default(self, *args):
-        with mock.patch('functest.ci.run_tests.os_utils.source_credentials',
-                        return_value=self.creds):
-            self.runner.source_rc_file()
+    @mock.patch('functest.ci.run_tests.LOGGER.error')
+    @mock.patch('functest.ci.run_tests.Runner.get_dict_by_test',
+                return_value=None)
+    def test_get_run_dict_config_ko(self, *args):
+        testname = 'test_name'
+        self.assertEqual(self.runner.get_run_dict(testname), None)
+        args[0].return_value = {}
+        self.assertEqual(self.runner.get_run_dict(testname), None)
+        calls = [mock.call(testname), mock.call(testname)]
+        args[0].assert_has_calls(calls)
+        calls = [mock.call("Cannot get %s's config options", testname),
+                 mock.call("Cannot get %s's config options", testname)]
+        args[1].assert_has_calls(calls)
 
-    def test_get_run_dict_if_defined_default(self):
-        mock_obj = mock.Mock()
-        with mock.patch('functest.ci.run_tests.'
-                        'ft_utils.get_dict_by_test',
-                        return_value={'run': mock_obj}):
-            self.assertEqual(self.runner.get_run_dict('test_name'),
-                             mock_obj)
+    @mock.patch('functest.ci.run_tests.LOGGER.exception')
+    @mock.patch('functest.ci.run_tests.Runner.get_dict_by_test',
+                side_effect=Exception)
+    def test_get_run_dict_exception(self, *args):
+        testname = 'test_name'
+        self.assertEqual(self.runner.get_run_dict(testname), None)
+        args[1].assert_called_once_with(
+            "Cannot get %s's config options", testname)
 
-    @mock.patch('functest.ci.run_tests.logger.error')
-    def test_get_run_dict_if_defined_missing_config_option(self,
-                                                           mock_logger_error):
-        with mock.patch('functest.ci.run_tests.'
-                        'ft_utils.get_dict_by_test',
-                        return_value=None):
-            testname = 'test_name'
-            self.assertEqual(self.runner.get_run_dict(testname),
-                             None)
-            mock_logger_error.assert_called_once_with("Cannot get {}'s config "
-                                                      "options"
-                                                      .format(testname))
+    def _test_source_envfile(self, msg, key='OS_TENANT_NAME', value='admin'):
+        try:
+            del os.environ[key]
+        except Exception:  # pylint: disable=broad-except
+            pass
+        envfile = 'rc_file'
+        with mock.patch('six.moves.builtins.open',
+                        mock.mock_open(read_data=msg)) as mock_method,\
+                mock.patch('os.path.isfile', return_value=True):
+            mock_method.return_value.__iter__ = lambda self: iter(
+                self.readline, '')
+            self.runner.source_envfile(envfile)
+            mock_method.assert_called_once_with(envfile, 'r')
+            self.assertEqual(os.environ[key], value)
 
-        with mock.patch('functest.ci.run_tests.'
-                        'ft_utils.get_dict_by_test',
-                        return_value={}):
-            testname = 'test_name'
-            self.assertEqual(self.runner.get_run_dict(testname),
-                             None)
+    def test_source_envfile(self):
+        self._test_source_envfile('OS_TENANT_NAME=admin')
+        self._test_source_envfile('OS_TENANT_NAME= admin')
+        self._test_source_envfile('OS_TENANT_NAME = admin')
+        self._test_source_envfile('OS_TENANT_NAME = "admin"')
+        self._test_source_envfile('export OS_TENANT_NAME=admin')
+        self._test_source_envfile('export OS_TENANT_NAME =admin')
+        self._test_source_envfile('export OS_TENANT_NAME = admin')
+        self._test_source_envfile('export OS_TENANT_NAME = "admin"')
+        # This test will fail as soon as rc_file is fixed
+        self._test_source_envfile(
+            'export "\'OS_TENANT_NAME\'" = "\'admin\'"')
 
-    @mock.patch('functest.ci.run_tests.logger.exception')
-    def test_get_run_dict_if_defined_exception(self,
-                                               mock_logger_except):
-        with mock.patch('functest.ci.run_tests.'
-                        'ft_utils.get_dict_by_test',
-                        side_effect=Exception):
-            testname = 'test_name'
-            self.assertEqual(self.runner.get_run_dict(testname),
-                             None)
-            mock_logger_except.assert_called_once_with("Cannot get {}'s config"
-                                                       " options"
-                                                       .format(testname))
+    def test_get_dict_by_test(self):
+        with mock.patch('six.moves.builtins.open', mock.mock_open()), \
+                mock.patch('yaml.safe_load') as mock_yaml:
+            mock_obj = mock.Mock()
+            testcase_dict = {'case_name': 'testname',
+                             'criteria': 50}
+            attrs = {'get.return_value': [{'testcases': [testcase_dict]}]}
+            mock_obj.configure_mock(**attrs)
+            mock_yaml.return_value = mock_obj
+            self.assertDictEqual(
+                run_tests.Runner.get_dict_by_test('testname'),
+                testcase_dict)
 
-    def test_run_tests_import_test_class_exception(self):
+    @mock.patch('functest.ci.run_tests.Runner.get_run_dict',
+                return_value=None)
+    def test_run_tests_import_exception(self, *args):
         mock_test = mock.Mock()
-        args = {'get_name.return_value': 'test_name',
-                'needs_clean.return_value': False}
-        mock_test.configure_mock(**args)
-        with mock.patch('functest.ci.run_tests.Runner.source_rc_file'), \
-            mock.patch('functest.ci.run_tests.Runner.get_run_dict',
-                       return_value=None), \
-                self.assertRaises(Exception) as context:
-            self.runner(mock_test, 'tier_name')
-            msg = "Cannot import the class for the test case."
-            self.assertTrue(msg in context)
+        kwargs = {'get_name.return_value': 'test_name',
+                  'needs_clean.return_value': False}
+        mock_test.configure_mock(**kwargs)
+        with self.assertRaises(Exception) as context:
+            self.runner.run_test(mock_test)
+        args[0].assert_called_with('test_name')
+        msg = "Cannot import the class for the test case."
+        self.assertTrue(msg in str(context.exception))
 
-    @mock.patch('functest.ci.run_tests.Runner.source_rc_file')
     @mock.patch('importlib.import_module', name="module",
                 return_value=mock.Mock(test_class=mock.Mock(
                     side_effect=FakeModule)))
-    @mock.patch('functest.utils.functest_utils.get_dict_by_test')
+    @mock.patch('functest.ci.run_tests.Runner.get_dict_by_test')
     def test_run_tests_default(self, *args):
         mock_test = mock.Mock()
         kwargs = {'get_name.return_value': 'test_name',
@@ -139,6 +153,8 @@ class RunTestsTesting(unittest.TestCase):
                         return_value=test_run_dict):
             self.runner.clean_flag = True
             self.runner.run_test(mock_test)
+        args[0].assert_called_with('test_name')
+        args[1].assert_called_with('test_module')
         self.assertEqual(self.runner.overall_result,
                          run_tests.Result.EX_OK)
 
@@ -149,96 +165,101 @@ class RunTestsTesting(unittest.TestCase):
                          run_tests.Result.EX_OK)
         mock_methods[0].assert_called_with(mock.ANY)
 
-    @mock.patch('functest.ci.run_tests.logger.info')
+    @mock.patch('functest.ci.run_tests.LOGGER.info')
     def test_run_tier_missing_test(self, mock_logger_info):
         self.tier.get_tests.return_value = None
         self.assertEqual(self.runner.run_tier(self.tier),
                          run_tests.Result.EX_ERROR)
         self.assertTrue(mock_logger_info.called)
 
-    @mock.patch('functest.ci.run_tests.logger.info')
+    @mock.patch('functest.ci.run_tests.LOGGER.info')
     @mock.patch('functest.ci.run_tests.Runner.run_tier')
     @mock.patch('functest.ci.run_tests.Runner.summary')
     def test_run_all_default(self, *mock_methods):
-        CONST.__setattr__('CI_LOOP', 'test_ci_loop')
+        os.environ['CI_LOOP'] = 'test_ci_loop'
         self.runner.run_all()
         mock_methods[1].assert_not_called()
         self.assertTrue(mock_methods[2].called)
 
-    @mock.patch('functest.ci.run_tests.logger.info')
+    @mock.patch('functest.ci.run_tests.LOGGER.info')
     @mock.patch('functest.ci.run_tests.Runner.summary')
     def test_run_all_missing_tier(self, *mock_methods):
-        CONST.__setattr__('CI_LOOP', 'loop_re_not_available')
+        os.environ['CI_LOOP'] = 'loop_re_not_available'
         self.runner.run_all()
         self.assertTrue(mock_methods[1].called)
 
-    @mock.patch('functest.ci.run_tests.Runner.source_rc_file',
+    @mock.patch('functest.ci.run_tests.Runner.source_envfile',
                 side_effect=Exception)
     @mock.patch('functest.ci.run_tests.Runner.summary')
     def test_main_failed(self, *mock_methods):
         kwargs = {'test': 'test_name', 'noclean': True, 'report': True}
         args = {'get_tier.return_value': False,
                 'get_test.return_value': False}
-        self.runner._tiers = mock.Mock()
-        self.runner._tiers.configure_mock(**args)
+        self.runner.tiers = mock.Mock()
+        self.runner.tiers.configure_mock(**args)
         self.assertEqual(self.runner.main(**kwargs),
                          run_tests.Result.EX_ERROR)
         mock_methods[1].assert_called_once_with()
 
-    @mock.patch('functest.ci.run_tests.Runner.source_rc_file')
+    @mock.patch('functest.ci.run_tests.Runner.source_envfile')
     @mock.patch('functest.ci.run_tests.Runner.run_test',
                 return_value=TestCase.EX_OK)
     @mock.patch('functest.ci.run_tests.Runner.summary')
     def test_main_tier(self, *mock_methods):
         mock_tier = mock.Mock()
+        test_mock = mock.Mock()
+        test_mock.get_name.return_value = 'test1'
         args = {'get_name.return_value': 'tier_name',
-                'get_tests.return_value': ['test_name']}
+                'get_tests.return_value': [test_mock]}
         mock_tier.configure_mock(**args)
         kwargs = {'test': 'tier_name', 'noclean': True, 'report': True}
         args = {'get_tier.return_value': mock_tier,
                 'get_test.return_value': None}
-        self.runner._tiers = mock.Mock()
-        self.runner._tiers.configure_mock(**args)
+        self.runner.tiers = mock.Mock()
+        self.runner.tiers.configure_mock(**args)
         self.assertEqual(self.runner.main(**kwargs),
                          run_tests.Result.EX_OK)
-        mock_methods[1].assert_called_once_with('test_name')
+        mock_methods[1].assert_called()
 
-    @mock.patch('functest.ci.run_tests.Runner.source_rc_file')
+    @mock.patch('functest.ci.run_tests.Runner.source_envfile')
     @mock.patch('functest.ci.run_tests.Runner.run_test',
                 return_value=TestCase.EX_OK)
     def test_main_test(self, *mock_methods):
         kwargs = {'test': 'test_name', 'noclean': True, 'report': True}
         args = {'get_tier.return_value': None,
                 'get_test.return_value': 'test_name'}
-        self.runner._tiers = mock.Mock()
-        self.runner._tiers.configure_mock(**args)
+        self.runner.tiers = mock.Mock()
+        mock_methods[1].return_value = self.creds
+        self.runner.tiers.configure_mock(**args)
         self.assertEqual(self.runner.main(**kwargs),
                          run_tests.Result.EX_OK)
         mock_methods[0].assert_called_once_with('test_name')
 
-    @mock.patch('functest.ci.run_tests.Runner.source_rc_file')
+    @mock.patch('functest.ci.run_tests.Runner.source_envfile')
     @mock.patch('functest.ci.run_tests.Runner.run_all')
     @mock.patch('functest.ci.run_tests.Runner.summary')
-    def test_main_all_tier(self, *mock_methods):
-        kwargs = {'test': 'all', 'noclean': True, 'report': True}
-        args = {'get_tier.return_value': None,
-                'get_test.return_value': None}
-        self.runner._tiers = mock.Mock()
-        self.runner._tiers.configure_mock(**args)
-        self.assertEqual(self.runner.main(**kwargs),
-                         run_tests.Result.EX_OK)
-        mock_methods[1].assert_called_once_with()
+    def test_main_all_tier(self, *args):
+        kwargs = {'get_tier.return_value': None,
+                  'get_test.return_value': None}
+        self.runner.tiers = mock.Mock()
+        self.runner.tiers.configure_mock(**kwargs)
+        self.assertEqual(
+            self.runner.main(test='all', noclean=True, report=True),
+            run_tests.Result.EX_OK)
+        args[0].assert_called_once_with(None)
+        args[1].assert_called_once_with()
+        args[2].assert_called_once_with()
 
-    @mock.patch('functest.ci.run_tests.Runner.source_rc_file')
-    @mock.patch('functest.ci.run_tests.Runner.summary')
-    def test_main_any_tier_test_ko(self, *mock_methods):
-        kwargs = {'test': 'any', 'noclean': True, 'report': True}
-        args = {'get_tier.return_value': None,
-                'get_test.return_value': None}
-        self.runner._tiers = mock.Mock()
-        self.runner._tiers.configure_mock(**args)
-        self.assertEqual(self.runner.main(**kwargs),
-                         run_tests.Result.EX_ERROR)
+    @mock.patch('functest.ci.run_tests.Runner.source_envfile')
+    def test_main_any_tier_test_ko(self, *args):
+        kwargs = {'get_tier.return_value': None,
+                  'get_test.return_value': None}
+        self.runner.tiers = mock.Mock()
+        self.runner.tiers.configure_mock(**kwargs)
+        self.assertEqual(
+            self.runner.main(test='any', noclean=True, report=True),
+            run_tests.Result.EX_ERROR)
+        args[0].assert_called_once_with()
 
 
 if __name__ == "__main__":

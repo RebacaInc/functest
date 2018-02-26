@@ -10,7 +10,6 @@
 
 import logging
 import os.path
-import re
 import sys
 import time
 
@@ -23,7 +22,7 @@ from novaclient import client as novaclient
 from keystoneclient import client as keystoneclient
 from neutronclient.neutron import client as neutronclient
 
-from functest.utils.constants import CONST
+from functest.utils import env
 import functest.utils.functest_utils as ft_utils
 
 logger = logging.getLogger(__name__)
@@ -113,62 +112,6 @@ def get_credentials(other_creds={}):
     creds.update(other_creds)
 
     return creds
-
-
-def source_credentials(rc_file):
-    with open(rc_file, "r") as f:
-        for line in f:
-            var = (line.rstrip('"\n').replace('export ', '').split("=")
-                   if re.search(r'(.*)=(.*)', line) else None)
-            # The two next lines should be modified as soon as rc_file
-            # conforms with common rules. Be aware that it could induce
-            # issues if value starts with '
-            if var:
-                key = re.sub(r'^["\' ]*|[ \'"]*$', '', var[0])
-                value = re.sub(r'^["\' ]*|[ \'"]*$', '', "".join(var[1:]))
-                os.environ[key] = value
-
-
-def get_credentials_for_rally():
-    creds = get_credentials()
-    env_cred_dict = get_env_cred_dict()
-    rally_conf = {"type": "ExistingCloud", "admin": {}}
-    for key in creds:
-        if key == 'auth_url':
-            rally_conf[key] = creds[key]
-        else:
-            rally_conf['admin'][key] = creds[key]
-
-    endpoint_types = [('internalURL', 'internal'),
-                      ('publicURL', 'public'), ('adminURL', 'admin')]
-
-    endpoint_type = get_endpoint_type_from_env()
-    if endpoint_type is not None:
-        cred_key = env_cred_dict.get('OS_ENDPOINT_TYPE')
-        for k, v in endpoint_types:
-            if endpoint_type == v:
-                rally_conf[cred_key] = v
-
-    region_name = os.getenv('OS_REGION_NAME')
-    if region_name is not None:
-        cred_key = env_cred_dict.get('OS_REGION_NAME')
-        rally_conf[cred_key] = region_name
-
-    cred_key = env_cred_dict.get('OS_CACERT')
-    rally_conf[cred_key] = os.getenv('OS_CACERT', '')
-
-    insecure_key = env_cred_dict.get('OS_INSECURE')
-    rally_conf[insecure_key] = os.getenv('OS_INSECURE', '').lower() == 'true'
-
-    return rally_conf
-
-
-def get_endpoint_type_from_env():
-    endpoint_type = os.environ.get("OS_ENDPOINT_TYPE",
-                                   os.environ.get("OS_INTERFACE"))
-    if endpoint_type and "URL" in endpoint_type:
-        endpoint_type = endpoint_type.replace("URL", "")
-    return endpoint_type
 
 
 def get_session_auth(other_creds={}):
@@ -560,7 +503,10 @@ def create_instance_and_wait_for_active(flavor_name,
     count = VM_BOOT_TIMEOUT / SLEEP
     for n in range(count, -1, -1):
         status = get_instance_status(nova_client, instance)
-        if status.lower() == "active":
+        if status is None:
+            time.sleep(SLEEP)
+            continue
+        elif status.lower() == "active":
             return instance
         elif status.lower() == "error":
             logger.error("The instance %s went to ERROR status."
@@ -713,8 +659,8 @@ def get_private_net(neutron_client):
 
 
 def get_external_net(neutron_client):
-    if (hasattr(CONST, 'EXTERNAL_NETWORK')):
-        return CONST.__getattribute__('EXTERNAL_NETWORK')
+    if (env.get('EXTERNAL_NETWORK')):
+        return env.get('EXTERNAL_NETWORK')
     for network in neutron_client.list_networks()['networks']:
         if network['router:external']:
             return network['name']
@@ -722,9 +668,9 @@ def get_external_net(neutron_client):
 
 
 def get_external_net_id(neutron_client):
-    if (hasattr(CONST, 'EXTERNAL_NETWORK')):
+    if (env.get('EXTERNAL_NETWORK')):
         networks = neutron_client.list_networks(
-            name=CONST.__getattribute__('EXTERNAL_NETWORK'))
+            name=env.get('EXTERNAL_NETWORK'))
         net_id = networks['networks'][0]['id']
         return net_id
     for network in neutron_client.list_networks()['networks']:
@@ -1195,8 +1141,13 @@ def get_image_id(glance_client, image_name):
     return id
 
 
-def create_glance_image(glance_client, image_name, file_path, disk="qcow2",
-                        container="bare", public="public"):
+def create_glance_image(glance_client,
+                        image_name,
+                        file_path,
+                        disk="qcow2",
+                        extra_properties={},
+                        container="bare",
+                        public="public"):
     if not os.path.isfile(file_path):
         logger.error("Error: file %s does not exist." % file_path)
         return None
@@ -1211,7 +1162,8 @@ def create_glance_image(glance_client, image_name, file_path, disk="qcow2",
             image = glance_client.images.create(name=image_name,
                                                 visibility=public,
                                                 disk_format=disk,
-                                                container_format=container)
+                                                container_format=container,
+                                                **extra_properties)
             image_id = image.id
             with open(file_path) as image_data:
                 glance_client.images.upload(image_id, image_data)
@@ -1222,7 +1174,7 @@ def create_glance_image(glance_client, image_name, file_path, disk="qcow2",
         return None
 
 
-def get_or_create_image(name, path, format):
+def get_or_create_image(name, path, format, extra_properties):
     image_exists = False
     glance_client = get_glance_client()
 
@@ -1232,7 +1184,11 @@ def get_or_create_image(name, path, format):
         image_exists = True
     else:
         logger.info("Creating image '%s' from '%s'..." % (name, path))
-        image_id = create_glance_image(glance_client, name, path, format)
+        image_id = create_glance_image(glance_client,
+                                       name,
+                                       path,
+                                       format,
+                                       extra_properties)
         if not image_id:
             logger.error("Failed to create a Glance image...")
         else:
@@ -1261,29 +1217,6 @@ def get_volumes(cinder_client):
         return volumes
     except Exception as e:
         logger.error("Error [get_volumes(cinder_client)]: %s" % e)
-        return None
-
-
-def list_volume_types(cinder_client, public=True, private=True):
-    try:
-        volume_types = cinder_client.volume_types.list()
-        if not public:
-            volume_types = [vt for vt in volume_types if not vt.is_public]
-        if not private:
-            volume_types = [vt for vt in volume_types if vt.is_public]
-        return volume_types
-    except Exception as e:
-        logger.error("Error [list_volume_types(cinder_client)]: %s" % e)
-        return None
-
-
-def create_volume_type(cinder_client, name):
-    try:
-        volume_type = cinder_client.volume_types.create(name)
-        return volume_type
-    except Exception as e:
-        logger.error("Error [create_volume_type(cinder_client, '%s')]: %s"
-                     % (name, e))
         return None
 
 
@@ -1317,16 +1250,6 @@ def delete_volume(cinder_client, volume_id, forced=False):
     except Exception as e:
         logger.error("Error [delete_volume(cinder_client, '%s', '%s')]: %s"
                      % (volume_id, str(forced), e))
-        return False
-
-
-def delete_volume_type(cinder_client, volume_type):
-    try:
-        cinder_client.volume_types.delete(volume_type)
-        return True
-    except Exception as e:
-        logger.error("Error [delete_volume_type(cinder_client, '%s')]: %s"
-                     % (volume_type, e))
         return False
 
 
@@ -1397,7 +1320,7 @@ def get_domain_id(keystone_client, domain_name):
 def create_tenant(keystone_client, tenant_name, tenant_description):
     try:
         if is_keystone_v3():
-            domain_name = CONST.__getattribute__('OS_PROJECT_DOMAIN_NAME')
+            domain_name = os.environ['OS_PROJECT_DOMAIN_NAME']
             domain_id = get_domain_id(keystone_client, domain_name)
             tenant = keystone_client.projects.create(
                 name=tenant_name,
@@ -1561,62 +1484,3 @@ def get_resource(heat_client, stack_id, resource):
     except Exception as e:
         logger.error("Error [get_resource]: %s" % e)
         return None
-
-
-# *********************************************
-#   TEMPEST
-# *********************************************
-def init_tempest_cleanup(tempest_config_dir=None,
-                         tempest_config_filename='tempest.conf',
-                         output_file=None):
-    """
-    Initialize the Tempest Cleanup utility.
-    See  https://docs.openstack.org/tempest/latest/cleanup.html for docs.
-
-    :param tempest_config_dir: The directory where the Tempest config file is
-            located. If not specified, we let Tempest pick both the directory
-            and the filename (i.e. second parameter is ignored)
-    :param tempest_config_filename: The filename of the Tempest config file
-    :param output_file: Optional file where to save output
-    """
-    # The Tempest cleanup utility currently offers no cmd argument to specify
-    # the config file, therefore it has to be configured with env variables
-    env = None
-    if tempest_config_dir:
-        env = os.environ.copy()
-        env['TEMPEST_CONFIG_DIR'] = tempest_config_dir
-        env['TEMPEST_CONFIG'] = tempest_config_filename
-
-    # If this command fails, an exception must be raised to stop the script
-    # otherwise the later cleanup would destroy also other resources
-    cmd_line = "tempest cleanup --init-saved-state"
-    ft_utils.execute_command_raise(cmd_line, env=env, output_file=output_file,
-                                   error_msg="Tempest cleanup init failed")
-
-
-def perform_tempest_cleanup(tempest_config_dir=None,
-                            tempest_config_filename='tempest.conf',
-                            output_file=None):
-    """
-    Perform cleanup using the Tempest Cleanup utility.
-    See  https://docs.openstack.org/tempest/latest/cleanup.html for docs.
-
-    :param tempest_config_dir: The directory where the Tempest config file is
-            located. If not specified, we let Tempest pick both the directory
-            and the filename (i.e. second parameter is ignored)
-    :param tempest_config_filename: The filename of the Tempest config file
-    :param output_file: Optional file where to save output
-    """
-    # The Tempest cleanup utility currently offers no cmd argument to specify
-    # the config file, therefore it has to be configured with env variables
-    env = None
-    if tempest_config_dir:
-        env = os.environ.copy()
-        env['TEMPEST_CONFIG_DIR'] = tempest_config_dir
-        env['TEMPEST_CONFIG'] = tempest_config_filename
-
-    # If this command fails, an exception must be raised to stop the script
-    # otherwise the later cleanup would destroy also other resources
-    cmd_line = "tempest cleanup"
-    ft_utils.execute_command(cmd_line, env=env, output_file=output_file,
-                             error_msg="Tempest cleanup failed")

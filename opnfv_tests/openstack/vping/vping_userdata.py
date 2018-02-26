@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-#
+
 # Copyright (c) 2015 All rights reserved
 # This program and the accompanying materials
 # are made available under the terms of the Apache License, Version 2.0
@@ -7,11 +7,13 @@
 #
 # http://www.apache.org/licenses/LICENSE-2.0
 
+"""vping_userdata testcase."""
+
 import time
 
+from snaps.config.network import PortConfig
+from snaps.config.vm_inst import VmInstanceConfig
 from snaps.openstack.utils import deploy_utils
-from snaps.openstack.create_instance import VmInstanceSettings
-from snaps.openstack.create_network import PortSettings
 
 from functest.core.testcase import TestCase
 from functest.opnfv_tests.openstack.vping import vping_base
@@ -27,7 +29,7 @@ class VPingUserdata(vping_base.VPingBase):
             kwargs["case_name"] = "vping_userdata"
         super(VPingUserdata, self).__init__(**kwargs)
 
-    def run(self):
+    def run(self, **kwargs):
         """
         Sets up the OpenStack VM instance objects then executes the ping and
         validates.
@@ -37,18 +39,18 @@ class VPingUserdata(vping_base.VPingBase):
             super(VPingUserdata, self).run()
 
             # Creating Instance 1
-            port1_settings = PortSettings(
+            port1_settings = PortConfig(
                 name=self.vm1_name + '-vPingPort',
                 network_name=self.network_creator.network_settings.name)
-            instance1_settings = VmInstanceSettings(
+            instance1_settings = VmInstanceConfig(
                 name=self.vm1_name,
                 flavor=self.flavor_name,
                 vm_boot_timeout=self.vm_boot_timeout,
                 port_settings=[port1_settings])
 
             self.logger.info(
-                "Creating VM 1 instance with name: '%s'"
-                % instance1_settings.name)
+                "Creating VM 1 instance with name: '%s'",
+                instance1_settings.name)
             self.vm1_creator = deploy_utils.create_vm_instance(
                 self.os_creds, instance1_settings,
                 self.image_creator.image_settings)
@@ -58,10 +60,10 @@ class VPingUserdata(vping_base.VPingBase):
                 self.vm1_creator.get_port_ip(port1_settings.name))
             if userdata:
                 # Creating Instance 2
-                port2_settings = PortSettings(
+                port2_settings = PortConfig(
                     name=self.vm2_name + '-vPingPort',
                     network_name=self.network_creator.network_settings.name)
-                instance2_settings = VmInstanceSettings(
+                instance2_settings = VmInstanceConfig(
                     name=self.vm2_name,
                     flavor=self.flavor_name,
                     vm_boot_timeout=self.vm_boot_timeout,
@@ -69,8 +71,8 @@ class VPingUserdata(vping_base.VPingBase):
                     userdata=userdata)
 
                 self.logger.info(
-                    "Creating VM 2 instance with name: '%s'"
-                    % instance2_settings.name)
+                    "Creating VM 2 instance with name: '%s'",
+                    instance2_settings.name)
                 self.vm2_creator = deploy_utils.create_vm_instance(
                     self.os_creds, instance2_settings,
                     self.image_creator.image_settings)
@@ -88,7 +90,7 @@ class VPingUserdata(vping_base.VPingBase):
         Override from super
         """
         self.logger.info("Waiting for ping...")
-        exit_code = -1
+        exit_code = TestCase.EX_TESTCASE_FAILED
         sec = 0
         tries = 0
 
@@ -100,7 +102,7 @@ class VPingUserdata(vping_base.VPingBase):
                 exit_code = TestCase.EX_OK
                 break
             elif "failed to read iid from metadata" in p_console or tries > 5:
-                exit_code = TestCase.EX_TESTCASE_FAILED
+                self.logger.info("Failed to read iid from metadata")
                 break
             elif sec == self.ping_timeout:
                 self.logger.info("Timeout reached.")
@@ -113,7 +115,7 @@ class VPingUserdata(vping_base.VPingBase):
                     tries += 1
                 else:
                     self.logger.debug(
-                        "Pinging %s. Waiting for response..." % test_ip)
+                        "Pinging %s. Waiting for response...", test_ip)
             sec += 1
 
         return exit_code
@@ -137,5 +139,5 @@ def _get_userdata(test_ip):
                 "  echo 'vPing KO'\n"
                 " fi\n"
                 " sleep 1\n"
-                "done\n" % test_ip)
+                "done\n" % str(test_ip))
     return None

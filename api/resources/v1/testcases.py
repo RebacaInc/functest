@@ -11,43 +11,60 @@
 Resources to handle testcase related requests
 """
 
+import ConfigParser
 import logging
 import os
-import pkg_resources
+import re
+import socket
 import uuid
 
-import ConfigParser
-from flask import abort, jsonify
+from flask import jsonify
+from flasgger.utils import swag_from
+import pkg_resources
 
 from functest.api.base import ApiResource
 from functest.api.common import api_utils, thread
 from functest.cli.commands.cli_testcase import Testcase
 from functest.api.database.v1.handlers import TasksHandler
-from functest.utils.constants import CONST
+from functest.utils import config
+from functest.utils import env
 import functest.utils.functest_utils as ft_utils
 
 LOGGER = logging.getLogger(__name__)
+
+ADDRESS = socket.gethostbyname(socket.gethostname())
+ENDPOINT_TESTCASES = ('http://{}:5000/api/v1/functest/testcases'
+                      .format(ADDRESS))
 
 
 class V1Testcases(ApiResource):
     """ V1Testcases Resource class"""
 
+    @swag_from(pkg_resources.resource_filename(
+        'functest', 'api/swagger/testcases.yaml'))
     def get(self):  # pylint: disable=no-self-use
         """ GET all testcases """
         testcases_list = Testcase().list()
-        result = {'testcases': testcases_list.split('\n')[:-1]}
+        result = {'testcases': re.split(' |\n ', testcases_list)[1:]}
         return jsonify(result)
 
 
 class V1Testcase(ApiResource):
     """ V1Testcase Resource class"""
 
+    @swag_from(
+        pkg_resources.resource_filename('functest',
+                                        'api/swagger/testcase.yaml'),
+        endpoint='{0}/<testcase_name>'.format(ENDPOINT_TESTCASES))
     def get(self, testcase_name):  # pylint: disable=no-self-use
         """ GET the info of one testcase"""
         testcase = Testcase().show(testcase_name)
         if not testcase:
-            abort(404, "The test case '%s' does not exist or is not supported"
-                  % testcase_name)
+            return api_utils.result_handler(
+                status=1,
+                data="The test case '%s' does not exist or is not supported"
+                % testcase_name)
+
         testcase_info = api_utils.change_obj_to_dict(testcase)
         dependency_dict = api_utils.change_obj_to_dict(
             testcase_info.get('dependency'))
@@ -58,6 +75,10 @@ class V1Testcase(ApiResource):
         result.update({'dependency': dependency_dict})
         return jsonify(result)
 
+    @swag_from(
+        pkg_resources.resource_filename('functest',
+                                        'api/swagger/testcase_run.yaml'),
+        endpoint='{0}/action'.format(ENDPOINT_TESTCASES))
     def post(self):
         """ Used to handle post request """
         return self._dispatch_post()
@@ -70,6 +91,13 @@ class V1Testcase(ApiResource):
             return api_utils.result_handler(
                 status=1, data='testcase name must be provided')
 
+        testcase = Testcase().show(case_name)
+        if not testcase:
+            return api_utils.result_handler(
+                status=1,
+                data="The test case '%s' does not exist or is not supported"
+                % case_name)
+
         task_id = str(uuid.uuid4())
 
         task_args = {'testcase': case_name, 'task_id': task_id}
@@ -79,8 +107,8 @@ class V1Testcase(ApiResource):
         task_thread = thread.TaskThread(self._run, task_args, TasksHandler())
         task_thread.start()
 
-        results = {'testcase': case_name, 'task_id': task_id}
-        return jsonify(results)
+        result = {'testcase': case_name, 'task_id': task_id}
+        return jsonify({'result': result})
 
     def _run(self, args):  # pylint: disable=no-self-use
         """ The built_in function to run a test case """
@@ -88,45 +116,42 @@ class V1Testcase(ApiResource):
         case_name = args.get('testcase')
         self._update_logging_ini(args.get('task_id'))
 
-        if not os.path.isfile(CONST.__getattribute__('env_active')):
-            raise Exception("Functest environment is not ready.")
+        try:
+            cmd = "run_tests -t {}".format(case_name)
+            runner = ft_utils.execute_command(cmd)
+        except Exception:  # pylint: disable=broad-except
+            result = 'FAIL'
+            LOGGER.exception("Running test case %s failed!", case_name)
+        if runner == os.EX_OK:
+            result = 'PASS'
         else:
-            try:
-                cmd = "run_tests -t {}".format(case_name)
-                runner = ft_utils.execute_command(cmd)
-            except Exception:  # pylint: disable=broad-except
-                result = 'FAIL'
-                LOGGER.exception("Running test case %s failed!", case_name)
-            if runner == os.EX_OK:
-                result = 'PASS'
-            else:
-                result = 'FAIL'
+            result = 'FAIL'
 
-            env_info = {
-                'installer': CONST.__getattribute__('INSTALLER_TYPE'),
-                'scenario': CONST.__getattribute__('DEPLOY_SCENARIO'),
-                'build_tag': CONST.__getattribute__('BUILD_TAG'),
-                'ci_loop': CONST.__getattribute__('CI_LOOP')
-            }
-            result = {
-                'task_id': args.get('task_id'),
-                'case_name': case_name,
-                'env_info': env_info,
-                'result': result
-            }
+        env_info = {
+            'installer': env.get('INSTALLER_TYPE'),
+            'scenario': env.get('DEPLOY_SCENARIO'),
+            'build_tag': env.get('BUILD_TAG'),
+            'ci_loop': env.get('CI_LOOP')
+        }
+        result = {
+            'task_id': args.get('task_id'),
+            'testcase': case_name,
+            'env_info': env_info,
+            'result': result
+        }
 
-            return {'result': result}
+        return {'result': result}
 
     def _update_logging_ini(self, task_id):  # pylint: disable=no-self-use
         """ Update the log file for each task"""
-        config = ConfigParser.RawConfigParser()
-        config.read(
+        rconfig = ConfigParser.RawConfigParser()
+        rconfig.read(
             pkg_resources.resource_filename('functest', 'ci/logging.ini'))
-        log_path = os.path.join(CONST.__getattribute__('dir_results'),
+        log_path = os.path.join(getattr(config.CONF, 'dir_results'),
                                 '{}.log'.format(task_id))
-        config.set('handler_file', 'args', '("{}",)'.format(log_path))
+        rconfig.set('handler_file', 'args', '("{}",)'.format(log_path))
 
         with open(
             pkg_resources.resource_filename(
                 'functest', 'ci/logging.ini'), 'wb') as configfile:
-            config.write(configfile)
+            rconfig.write(configfile)

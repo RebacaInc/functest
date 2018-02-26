@@ -1,9 +1,10 @@
+---
 tiers:
     -
         name: healthcheck
         order: 0
         ci_loop: '(daily)|(weekly)'
-        description : >-
+        description: >-
             First tier to be executed to verify the basic
             operations in the VIM.
         testcases:
@@ -22,7 +23,8 @@ tiers:
                     installer: '^((?!netvirt).)*$'
                     scenario: ''
                 run:
-                    module: 'functest.opnfv_tests.openstack.snaps.connection_check'
+                    module:
+                        'functest.opnfv_tests.openstack.snaps.connection_check'
                     class: 'ConnectionCheck'
 
             -
@@ -64,7 +66,7 @@ tiers:
         name: smoke
         order: 1
         ci_loop: '(daily)|(weekly)'
-        description : >-
+        description: >-
             Set of basic Functional tests to validate the OPNFV scenarios.
         testcases:
             -
@@ -73,9 +75,9 @@ tiers:
                 criteria: 100
                 blocking: true
                 description: >-
-                    This test case verifies: 1) SSH to an instance using floating
-                    IPs over the public network. 2) Connectivity between 2 instances
-                    over a private network.
+                    This test case verifies: 1) SSH to an instance using
+                    floating IPs over the public network. 2) Connectivity
+                    between 2 instances over a private network.
                 dependencies:
                     installer: ''
                     scenario: '^((?!odl_l3|odl-bgpvpn|gluon).)*$'
@@ -95,7 +97,8 @@ tiers:
                     installer: ''
                     scenario: '^((?!lxd).)*$'
                 run:
-                    module: 'functest.opnfv_tests.openstack.vping.vping_userdata'
+                    module:
+                        'functest.opnfv_tests.openstack.vping.vping_userdata'
                     class: 'VPingUserdata'
 
             -
@@ -142,7 +145,8 @@ tiers:
                     installer: ''
                     scenario: ''
                 run:
-                    module: 'functest.opnfv_tests.openstack.refstack_client.refstack_client'
+                    module:
+                        'functest.opnfv_tests.openstack.refstack_client.refstack_client'
                     class: 'RefstackClient'
 
             -
@@ -162,8 +166,8 @@ tiers:
                     class: 'ODLTests'
                     args:
                         suites:
-                            -  /src/odl_test/csit/suites/integration/basic
-                            -  /src/odl_test/csit/suites/openstack/neutron
+                            - /src/odl_test/csit/suites/integration/basic
+                            - /src/odl_test/csit/suites/openstack/neutron
 
             -
                 case_name: odl_netvirt
@@ -183,28 +187,9 @@ tiers:
                     class: 'ODLTests'
                     args:
                         suites:
-                            -  /src/odl_test/csit/suites/integration/basic
-                            -  /src/odl_test/csit/suites/openstack/neutron
-                            -  /src/odl_test/csit/suites/openstack/connectivity
-
-            -
-                case_name: fds
-                project_name: fastdatastacks
-                criteria: 100
-                blocking: false
-                description: >-
-                    Test Suite for the OpenDaylight SDN Controller when GBP features are
-                    installed. It integrates some test suites from upstream using
-                    Robot as the test framework.
-                dependencies:
-                    installer: 'apex'
-                    scenario: 'odl.*-fdio'
-                run:
-                    module: 'functest.opnfv_tests.sdn.odl.odl'
-                    class: 'ODLTests'
-                    args:
-                        suites:
-                            -  /src/fds/testing/robot
+                            - /src/odl_test/csit/suites/integration/basic
+                            - /src/odl_test/csit/suites/openstack/neutron
+                            - /src/odl_test/csit/suites/openstack/connectivity
 
             -
                 case_name: snaps_smoke
@@ -231,31 +216,13 @@ tiers:
         name: features
         order: 2
         ci_loop: '(daily)|(weekly)'
-        description : >-
+        description: >-
             Test suites from feature projects
             integrated in functest
         testcases:
             -
-                case_name: promise
-                project_name: promise
-                enabled: false
-                criteria: 100
-                blocking: false
-                description: >-
-                    Test suite from Promise project.
-                dependencies:
-                    installer: '(fuel)|(joid)'
-                    scenario: ''
-                run:
-                    module: 'functest.core.feature'
-                    class: 'BashFeature'
-                    args:
-                        cmd: 'run_promise_tests.py'
-
-            -
                 case_name: doctor-notification
                 project_name: doctor
-                enabled: false
                 criteria: 100
                 blocking: false
                 description: >-
@@ -272,7 +239,6 @@ tiers:
             -
                 case_name: bgpvpn
                 project_name: sdnvpn
-                enabled: false
                 criteria: 100
                 blocking: false
                 description: >-
@@ -287,11 +253,11 @@ tiers:
             -
                 case_name: functest-odl-sfc
                 project_name: sfc
-                enabled: false
                 criteria: 100
                 blocking: false
                 description: >-
-                    Test suite for odl-sfc to test two chains with one SF and one chain with two SFs
+                    Test suite for odl-sfc to test two chains with one SF and
+                    one chain with two SFs
                 dependencies:
                     installer: ''
                     scenario: 'odl.*sfc'
@@ -302,26 +268,8 @@ tiers:
                         cmd: 'run_sfc_tests.py'
 
             -
-                case_name: domino-multinode
-                project_name: domino
-                enabled: false
-                criteria: 100
-                blocking: false
-                description: >-
-                    Test suite from Domino project.
-                dependencies:
-                    installer: ''
-                    scenario: ''
-                run:
-                    module: 'functest.core.feature'
-                    class: 'BashFeature'
-                    args:
-                        cmd: 'run_multinode.sh'
-
-            -
                 case_name: barometercollectd
                 project_name: barometer
-                enabled: false
                 criteria: 100
                 blocking: false
                 description: >-
@@ -332,14 +280,33 @@ tiers:
                     installer: 'apex'
                     scenario: 'bar'
                 run:
-                     module: 'baro_tests.barometer'
-                     class: 'BarometerCollectd'
+                    module: 'baro_tests.barometer'
+                    class: 'BarometerCollectd'
+
+            -
+                case_name: fds
+                project_name: fastdatastacks
+                criteria: 100
+                blocking: false
+                description: >-
+                    Test Suite for the OpenDaylight SDN Controller when GBP
+                    features are installed. It integrates some test suites from
+                    upstream using Robot as the test framework.
+                dependencies:
+                    installer: 'apex'
+                    scenario: 'odl.*-fdio'
+                run:
+                    module: 'functest.opnfv_tests.sdn.odl.odl'
+                    class: 'ODLTests'
+                    args:
+                        suites:
+                            - /src/fds/testing/robot
 
     -
         name: components
         order: 3
         ci_loop: 'weekly'
-        description : >-
+        description: >-
             Extensive testing of OpenStack API.
         testcases:
             -
@@ -361,11 +328,11 @@ tiers:
             -
                 case_name: rally_full
                 project_name: functest
-                criteria: 90
+                criteria: 100
                 blocking: false
                 description: >-
-                    This test case runs the full suite of scenarios of the OpenStack
-                    Rally suite using several threads and iterations.
+                    This test case runs the full suite of scenarios of the
+                    OpenStack Rally suite using several threads and iterations.
                 dependencies:
                     installer: '^((?!netvirt).)*$'
                     scenario: ''
@@ -377,7 +344,7 @@ tiers:
         name: vnf
         order: 4
         ci_loop: '(daily)|(weekly)'
-        description : >-
+        description: >-
             Collection of VNF test cases.
         testcases:
             -
@@ -386,41 +353,15 @@ tiers:
                 criteria: 80
                 blocking: false
                 description: >-
-                    This test case deploys an OpenSource vIMS solution from Clearwater
-                    using the Cloudify orchestrator. It also runs some signaling traffic.
+                    This test case deploys an OpenSource vIMS solution from
+                    Clearwater using the Cloudify orchestrator. It also runs
+                    some signaling traffic.
                 dependencies:
                     installer: ''
-                    scenario: 'os-nosdn-nofeature-ha'
+                    scenario: 'os-nosdn-nofeature-.*ha'
                 run:
                     module: 'functest.opnfv_tests.vnf.ims.cloudify_ims'
                     class: 'CloudifyIms'
-            -
-                case_name: orchestra_openims
-                project_name: orchestra
-                criteria: 100
-                blocking: false
-                description: >-
-                    OpenIMS VNF deployment with Open Baton (Orchestra)
-                dependencies:
-                    installer: ''
-                    scenario: 'os-nosdn-nofeature-ha'
-                run:
-                    module: 'functest.opnfv_tests.vnf.ims.orchestra_openims'
-                    class: 'OpenImsVnf'
-
-            -
-                case_name: orchestra_clearwaterims
-                project_name: orchestra
-                criteria: 100
-                blocking: false
-                description: >-
-                    ClearwaterIMS VNF deployment with Open Baton (Orchestra)
-                dependencies:
-                    installer: ''
-                    scenario: 'os-nosdn-nofeature-ha'
-                run:
-                    module: 'functest.opnfv_tests.vnf.ims.orchestra_clearwaterims'
-                    class: 'ClearwaterImsVnf'
 
             -
                 case_name: vyos_vrouter
@@ -431,22 +372,53 @@ tiers:
                     This test case is vRouter testing.
                 dependencies:
                     installer: ''
-                    scenario: 'os-nosdn-nofeature-ha'
+                    scenario: 'os-nosdn-nofeature-.*ha'
                 run:
                     module: 'functest.opnfv_tests.vnf.router.cloudify_vrouter'
                     class: 'CloudifyVrouter'
 
             -
+                case_name: orchestra_openims
+                project_name: orchestra
+                enabled: false
+                criteria: 100
+                blocking: false
+                description: >-
+                    OpenIMS VNF deployment with Open Baton (Orchestra)
+                dependencies:
+                    installer: ''
+                    scenario: 'os-nosdn-nofeature-.*ha'
+                run:
+                    module: 'functest.opnfv_tests.vnf.ims.orchestra_openims'
+                    class: 'OpenImsVnf'
+
+            -
+                case_name: orchestra_clearwaterims
+                project_name: orchestra
+                enabled: false
+                criteria: 100
+                blocking: false
+                description: >-
+                    ClearwaterIMS VNF deployment with Open Baton (Orchestra)
+                dependencies:
+                    installer: ''
+                    scenario: 'os-nosdn-nofeature-.*ha'
+                run:
+                    module:
+                        'functest.opnfv_tests.vnf.ims.orchestra_clearwaterims'
+                    class: 'ClearwaterImsVnf'
+
+            -
                 case_name: juju_epc
-                enabled: true
                 project_name: functest
                 criteria: 100
                 blocking: false
                 description: >-
-                    vEPC validation with Juju as VNF manager and ABoT as test executor.
+                    vEPC validation with Juju as VNF manager and ABoT as test
+                    executor.
                 dependencies:
                     installer: ''
-                    scenario: 'os-nosdn-ovs_kvm-noha'
+                    scenario: 'os-nosdn-nofeature-.*ha'
                 run:
                     module: 'functest.opnfv_tests.vnf.epc.juju_epc'
                     class: 'JujuEpc'
